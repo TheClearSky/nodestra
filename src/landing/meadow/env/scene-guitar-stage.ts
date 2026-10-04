@@ -187,16 +187,34 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     preLean: lyingPose(heightAt, towardsCam.x * 1.55, towardsCam.y * 1.55, towardsCam.clone().negate()),
     heightAt,
   };
-  // The user's pick (2026-10-04): a random move on every Play, out of all
-  // three ("pick randomly between all 3: slide, magic and glide");
+  // A random move on every Play, out of all three, WEIGHTED (2026-10-05,
+  // Deepak: "guitar only ever does slide and lean animation in the demo,
+  // make magic more likely (50%), and glide (30%) and slide and lean 20%");
   // `?v=move:<id>` fixes one (testing), as does the HUD.
-  const RANDOM: MoveId[] = ['slide', 'magic', 'glide'];
+  const WEIGHTS: readonly (readonly [MoveId, number])[] = [
+    ['magic', 0.5],
+    ['glide', 0.3],
+    ['slide', 0.2],
+  ];
+  const randomMove = (): MoveId => {
+    let r = Math.random();
+    for (const [id, weight] of WEIGHTS) {
+      r -= weight;
+      if (r < 0) return id;
+    }
+    return WEIGHTS[0][0];
+  };
   let forcedMove: MoveId | null = (() => {
     const v = (params.get('v') ?? '').split(',').find((p) => p.startsWith('move:'))?.slice(5);
     return MOVES.some((m) => m.id === v) ? (v as MoveId) : null;
   })();
-  const pickMove = (): MoveId => forcedMove ?? RANDOM[Math.floor(Math.random() * RANDOM.length)];
+  const pickMove = (): MoveId => forcedMove ?? randomMove();
   let move: MoveId = pickMove();
+  // The move in play, on the canvas — tests and devtools read it there.
+  const showMove = () => {
+    canvas.dataset.move = move;
+  };
+  showMove();
 
   // ── the guitar: holder origin = body centre on the soundboard plane ──
   const holder = new THREE.Group();
@@ -724,6 +742,7 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
           rig.setClose(closeFor(move));
           lastU = -1;
         }
+        showMove();
       }
       rig.setLive(live);
       if (options.reducedMotion) still();
@@ -752,6 +771,7 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
       if (!MOVES.some((m) => m.id === id)) return;
       forcedMove = id as MoveId;
       move = forcedMove;
+      showMove();
       rig.setClose(closeFor(move));
       lastU = -1; // re-pose at the current progress
       if (options.reducedMotion) still();
