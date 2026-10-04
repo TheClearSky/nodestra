@@ -817,7 +817,12 @@ function App() {
 
   return (
     <>
-    <div className={appHidden ? 'app-covered flex h-screen flex-col' : 'flex h-screen flex-col'}>
+    {/* Clipped: the app fills a fixed-height screen and never scrolls the
+        page. Without the clip, a phone-wide toolbar or editor wider than the
+        screen made mobile browsers widen the whole page's layout (measured
+        390 -> 487 px), which pushed the landing stage's keys and buttons —
+        a full-screen overlay sized to that layout — off the visible screen. */}
+    <div className={appHidden ? 'app-covered flex h-screen w-full flex-col overflow-hidden' : 'flex h-screen w-full flex-col overflow-hidden'}>
       <header className='flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-secondary-dark-gray bg-secondary-black px-3 py-1.5'>
         <button
           type='button'
