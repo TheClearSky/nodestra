@@ -1,0 +1,1274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E · Encore+ · Nodestra — Encore</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%2315171c%22/%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q14%2054%206.9%2045.3%22%20stroke%3D%22%232ECC71%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q18%2042%2016.2%2031.4%22%20stroke%3D%22%233498DB%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q32%2038%2032%2026%22%20stroke%3D%22%23F1C40F%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q46%2042%2047.8%2031.4%22%20stroke%3D%22%23E74C3C%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q50%2054%2057.1%2045.3%22%20stroke%3D%22%239B59B6%22/%3E%0A%20%20%3C/g%3E%0A%20%20%3Ccircle%20cx%3D%226.9%22%20cy%3D%2245.3%22%20r%3D%224.2%22%20fill%3D%22%232ECC71%22/%3E%0A%20%20%3Ccircle%20cx%3D%2216.2%22%20cy%3D%2231.4%22%20r%3D%224.2%22%20fill%3D%22%233498DB%22/%3E%0A%20%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2226%22%20r%3D%224.2%22%20fill%3D%22%23F1C40F%22/%3E%0A%20%20%3Ccircle%20cx%3D%2247.8%22%20cy%3D%2231.4%22%20r%3D%224.2%22%20fill%3D%22%23E74C3C%22/%3E%0A%20%20%3Ccircle%20cx%3D%2257.1%22%20cy%3D%2245.3%22%20r%3D%224.2%22%20fill%3D%22%239B59B6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2252%22%20r%3D%226%22%20fill%3D%22%2315171c%22%20stroke%3D%22%23eceef3%22%20stroke-width%3D%223%22/%3E%0A%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --surround:#030304; --void:#0a0a0c; --ink:#ececec; --muted:#9a9a9a;
+  --audio:#2ECC71; --signal:#F1C40F; --number:#3498DB; --gate:#E74C3C; --wave:#9B59B6; --gold:#e9d3a8;
+  --font:'DejaVu Sans','Roboto',system-ui,sans-serif;
+  --serif:ui-serif,Georgia,Cambria,'Times New Roman',Times,serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink);font-family:var(--font)}
+#frame{position:fixed;inset:0;background:radial-gradient(ellipse at center,#0c0c10 0%,#030304 72%)}
+#stage{position:absolute;left:50%;top:50%;width:1600px;height:1000px;transform-origin:50% 50%;overflow:hidden;background:var(--void);border-radius:6px;box-shadow:0 0 0 1px rgba(255,255,255,.035),0 30px 140px rgba(0,0,0,.85);cursor:pointer;user-select:none;-webkit-user-select:none;opacity:0;transition:opacity .9s ease}
+#stage.ready{opacity:1}
+.layer{position:absolute;pointer-events:none}
+#dots1{left:-120px;top:-120px;width:1840px;height:1240px;background-image:radial-gradient(circle,rgba(255,255,255,.075) 1.1px,transparent 1.7px);background-size:24px 24px;will-change:transform}
+#dots2{left:-160px;top:-160px;width:1920px;height:1320px;background-image:radial-gradient(circle,rgba(255,255,255,.045) 1.9px,transparent 2.7px);background-size:72px 72px;will-change:transform}
+#neb{inset:-80px;background:
+  radial-gradient(620px 440px at 24% 30%,rgba(46,204,113,.075),transparent 70%),
+  radial-gradient(720px 520px at 78% 72%,rgba(155,89,182,.085),transparent 70%),
+  radial-gradient(520px 420px at 62% 18%,rgba(52,152,219,.05),transparent 70%);will-change:transform}
+#world{position:absolute;inset:0;perspective:1400px;perspective-origin:800px 500px}
+.panel{position:absolute;left:0;top:0;width:1440px;height:900px;transform-origin:0 0;border-radius:14px;overflow:hidden;background:#151515;box-shadow:0 40px 120px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.08);will-change:transform,opacity,filter;display:block;visibility:hidden}
+.panel img{display:block;width:1440px;height:900px;-webkit-user-drag:none}
+/* ---- live stage (the app's own three.js scene + its overlays, 1:1 from StageLanding.tsx) ---- */
+.livehost{position:relative;width:1440px;height:900px;background:#030102;overflow:hidden;font-family:system-ui,sans-serif}
+.livehost canvas{position:absolute;inset:0;width:1440px;height:900px;display:block}
+.lv-gate,.lv-piano{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
+.lv-gate{gap:16px;padding:112px 16px 40px;background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.45),transparent)}
+.lv-gate .eyebrow{margin:0;font:13px ui-serif,Georgia,Cambria,"Times New Roman",Times,serif;letter-spacing:.4em;text-transform:uppercase;color:rgba(233,211,168,.8)}
+.lv-gate .row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px}
+.lv-gate .start{border-radius:999px;border:1px solid rgba(233,211,168,.4);background:rgba(255,255,255,.08);padding:16px 40px;font:20px system-ui,sans-serif;color:#e6e6e6;box-shadow:0 0 48px rgba(255,190,110,.28);backdrop-filter:blur(12px);outline:2px solid #e9d3a8;outline-offset:4px}
+.lv-gate .piano{border-radius:999px;border:1px solid rgba(233,211,168,.25);background:rgba(0,0,0,.3);padding:16px 28px;font:18px system-ui,sans-serif;color:#e9d3a8;backdrop-filter:blur(12px)}
+.lv-gate .note{margin:0;font-size:13px;color:rgba(216,199,168,.75)}
+.lv-piano{gap:12px;padding:96px 16px 32px;background:linear-gradient(to top,rgba(0,0,0,.9),rgba(0,0,0,.5),transparent)}
+.lv-piano .hint{margin:0;font-size:14px;color:#e9d3a8}
+.lv-piano .oct{margin:0;font-size:12px;color:rgba(216,199,168,.75)}
+.lv-piano .oct b{font-weight:600;color:#e9d3a8}
+.lv-piano .oct span{border-radius:4px;border:1px solid rgba(233,211,168,.3);padding:0 6px;font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.lv-piano .enter{border-radius:999px;border:1px solid rgba(233,211,168,.4);background:rgba(255,255,255,.08);padding:12px 32px;font:16px system-ui,sans-serif;color:#e6e6e6;backdrop-filter:blur(12px)}
+.lv-back{position:absolute;top:20px;left:20px;border-radius:999px;border:1px solid rgba(233,211,168,.3);background:rgba(0,0,0,.4);padding:8px 20px;font:14px system-ui,sans-serif;color:#e9d3a8;backdrop-filter:blur(12px)}
+.lv-keys{position:relative;height:92px;width:340px}
+.lv-keys .pk{position:absolute;top:0;display:flex;align-items:flex-end;justify-content:center;box-sizing:border-box;border-radius:0 0 6px 6px;font-weight:600;text-transform:uppercase;transition:background-color 75ms,color 75ms}
+.lv-keys .w{height:92px;width:32px;border:1px solid rgba(0,0,0,.6);padding-bottom:6px;font-size:12px;background:#efe9dc;color:rgba(0,0,0,.6)}
+.lv-keys .b{height:56px;width:20px;z-index:10;padding-bottom:4px;font-size:11px;background:#141414;color:rgba(255,255,255,.7)}
+.lv-keys .w.down{background:#f3cf8a;color:#000}
+.lv-keys .b.down{background:#c9973f;color:#000}
+
+.panel iframe{border:0;display:block;width:1440px;height:900px;pointer-events:none;background:#1e1e1e;color-scheme:dark}
+#vig{inset:0;background:radial-gradient(ellipse 78% 72% at 50% 48%,transparent 52%,rgba(0,0,0,.6) 100%)}
+#fx{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none}
+#scrimB{left:0;right:0;bottom:0;height:300px;background:linear-gradient(to bottom,rgba(6,6,8,0),rgba(6,6,8,.8) 62%,rgba(6,6,8,.93));opacity:0}
+#scrimT{left:0;right:0;top:0;height:250px;background:linear-gradient(to top,rgba(0,0,0,0),rgba(0,0,0,.74));opacity:0}
+.cap{position:absolute;left:0;right:0;bottom:54px;text-align:center;opacity:0;will-change:opacity,transform,filter;pointer-events:none}
+.cap .eb{display:inline-flex;align-items:center;gap:11px;font-size:14px;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);margin-bottom:14px;font-weight:500}
+.cap .ln{font-size:34px;line-height:1.25;color:#efefef;font-weight:400;text-shadow:0 2px 24px rgba(0,0,0,.95),0 0 2px rgba(0,0,0,.8);padding:0 80px}
+.cap.stage{top:50px;bottom:auto}
+.cap.stage .eb{font-family:var(--serif);color:rgba(233,211,168,.85);letter-spacing:.44em;font-size:15px;font-weight:400}
+.cap.stage .ln{font-family:var(--serif);color:#f3e6c9;font-size:38px;letter-spacing:.01em;text-shadow:0 0 30px rgba(255,190,110,.35),0 2px 20px rgba(0,0,0,.95)}
+.g{width:12px;height:12px;background:var(--acc);display:inline-block;box-shadow:0 0 12px var(--acc)}
+.g.audio{clip-path:polygon(30% 0,100% 0,70% 100%,0 100%);width:17px}
+.g.signal{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);width:14px;height:14px}
+.g.number{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);width:15px;height:13px}
+.g.wave{border-radius:50%}
+#logo{inset:0;opacity:0;display:none}
+#mark{position:absolute;left:680px;top:250px;width:240px;height:240px;overflow:visible;color:#ececec;filter:drop-shadow(0 0 14px rgba(255,255,255,.12))}
+#word{position:absolute;left:0;right:0;top:520px;text-align:center;font-size:104px;font-weight:300;letter-spacing:.015em;color:#f2f2f2;text-shadow:0 0 40px rgba(255,255,255,.12)}
+#word span{display:inline-block;will-change:transform,opacity,filter}
+#tag{position:absolute;left:0;right:0;top:668px;text-align:center;font-size:27px;color:#bdbdbd;letter-spacing:.01em}
+/* C's warm stage spotlight (intro + ending) */
+#beam{position:absolute;inset:0;opacity:0;pointer-events:none}
+#beam .soft{position:absolute;inset:0;filter:blur(28px)}
+#beam .cone{position:absolute;left:0;right:0;top:-40px;bottom:0;
+  clip-path:polygon(44% 0,56% 0,82% 100%,18% 100%);
+  background:linear-gradient(to bottom,rgba(255,228,178,.30),rgba(255,214,160,.12) 55%,rgba(255,200,140,.035) 88%,transparent)}
+#beam .pool{position:absolute;inset:0;background:radial-gradient(ellipse 34% 12% at 50% 90%,rgba(255,196,130,.15),transparent 70%)}
+#trov{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none;overflow:visible}
+#motes{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none}
+#intro{position:absolute;left:0;right:0;top:474px;text-align:center;font-family:var(--serif);font-size:24px;letter-spacing:.9em;padding-left:.9em;color:var(--gold);opacity:0;pointer-events:none;text-shadow:0 0 18px rgba(255,210,150,.35)}
+#intro span{display:inline-block;opacity:0;filter:blur(8px);transition:opacity .9s ease,filter .9s ease}
+#intro span.on{opacity:1;filter:none}
+/* A's final slide: the mark draws itself, the nodes bloom, the dust gathers */
+#finale{position:absolute;inset:0;opacity:0;pointer-events:none}
+#finale .mark{position:absolute;left:680px;top:212px;width:240px;height:240px;color:#ececec;overflow:visible;filter:drop-shadow(0 0 14px rgba(255,255,255,.12))}
+#finale .mark path{stroke-dasharray:1;stroke-dashoffset:1}
+#finale .mark circle{transform-box:fill-box;transform-origin:center;transform:scale(0)}
+#finale.on .mark path{transition:stroke-dashoffset 1.1s cubic-bezier(.6,0,.2,1);stroke-dashoffset:0}
+#finale.on .mark circle{transition:transform .7s cubic-bezier(.3,1.6,.4,1);transform:scale(1)}
+#finale .word{position:absolute;left:0;right:0;top:500px;text-align:center;font-size:104px;font-weight:300;letter-spacing:.015em;color:#f2f2f2;text-shadow:0 0 40px rgba(255,255,255,.12);opacity:0;transform:translateY(12px);filter:blur(10px);transition:all 1.2s cubic-bezier(.2,.7,.2,1) 1.4s}
+#finale .tag{position:absolute;left:0;right:0;top:650px;text-align:center;font-size:27px;color:#bdbdbd;letter-spacing:.01em;opacity:0;filter:blur(6px);transition:all 1.2s ease 2.2s}
+#finale.on .word,#finale.on .tag{opacity:1;transform:none;filter:none}
+.embed #bar,.embed #hud{display:none!important}
+#bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.07);pointer-events:none}
+#bar i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,#2ECC71,#F1C40F 30%,#3498DB 55%,#E74C3C 78%,#9B59B6)}
+#bar b{position:absolute;top:0;width:1px;height:3px;background:rgba(0,0,0,.6)}
+#hud{position:absolute;right:22px;top:20px;padding:8px 16px;border-radius:999px;background:rgba(20,20,22,.78);border:1px solid rgba(255,255,255,.1);font-size:14px;color:#cfcfcf;letter-spacing:.02em;opacity:0;transition:opacity .25s;pointer-events:none}
+#hud.on{opacity:1}
+#loader{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:var(--muted);font-size:14px;letter-spacing:.08em;transition:opacity .6s ease}
+#loader.gone{opacity:0;pointer-events:none}
+#loader svg{width:56px;height:56px;color:#d8d8d8}
+#loader circle.n{animation:lp 1.6s ease-in-out infinite}
+#loader circle.n:nth-of-type(2){animation-delay:.15s}#loader circle.n:nth-of-type(3){animation-delay:.3s}
+#loader circle.n:nth-of-type(4){animation-delay:.45s}#loader circle.n:nth-of-type(5){animation-delay:.6s}
+@keyframes lp{0%,100%{opacity:.35}50%{opacity:1}}
+.lbar{width:160px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
+.lbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2ECC71,#F1C40F,#3498DB,#E74C3C,#9B59B6);transition:width .3s}
+@media (prefers-reduced-motion: reduce){ #loader circle.n{animation:none;opacity:.9} }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="stage" aria-label="Nodestra — animated tour. Click or press Space to pause, arrow keys to change scene." role="img">
+    <div id="neb" class="layer"></div>
+    <div id="dots2" class="layer"></div>
+    <div id="dots1" class="layer"></div>
+    <div id="beam"><div class="soft"><div class="cone"></div></div><div class="pool"></div></div>
+    <div id="world"></div>
+    <svg id="trov" viewBox="0 0 1600 1000" aria-hidden="true">
+      <defs>
+        <filter id="fV3" x="-2%" y="-10%" width="104%" height="120%"><feGaussianBlur stdDeviation="0 3"/></filter>
+        <filter id="fV10" x="-2%" y="-10%" width="104%" height="120%"><feGaussianBlur stdDeviation="0 10"/></filter>
+        <filter id="fV26" x="-2%" y="-15%" width="104%" height="130%"><feGaussianBlur stdDeviation="0 26"/></filter>
+        <clipPath id="surClip"><rect id="surA" x="0" y="0" width="1600" height="300"/><rect id="surB" x="0" y="620" width="1600" height="380"/></clipPath>
+        <pattern id="pDots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1.2" fill="#aeacb8" opacity=".16"/></pattern>
+      </defs>
+      <g id="gSlabs" display="none"><rect width="1600" height="1000" fill="#080f17"/>
+        <g transform="translate(800 500) scale(1.6667) rotate(45)"><rect id="sl1" y="-700" width="300" height="1400" fill="#525c68"/><rect id="sl2" y="-700" width="140" height="1400" fill="#7c8390"/></g>
+        <g transform="translate(800 500) scale(1.6667) rotate(-45)"><rect id="sl3" y="-700" width="420" height="1400" fill="#323e4b"/><rect id="sl4" y="-700" width="500" height="1400" fill="#080f17"/></g>
+        <rect x="880" y="550" width="800" height="500" fill="none" stroke="#aeacb8" stroke-width="1.6" opacity=".5"/></g>
+      <g id="gBars" display="none"><rect width="1600" height="1000" fill="#0d1824"/><rect width="1600" height="1000" fill="url(#pDots)"/><g transform="scale(1.6667)">
+        <g transform="translate(172.8 0) rotate(-45)"><rect x="-12" y="-40" width="24" height="360" fill="#f3f1f6"/></g>
+        <g transform="translate(787.2 0) rotate(45)"><rect x="-12" y="-40" width="24" height="360" fill="#f3f1f6"/></g>
+        <g transform="translate(720 81) rotate(45)"><rect x="-40" y="-40" width="80" height="80" fill="none" stroke="#f3f1f6" stroke-width="3"/></g></g></g>
+      <g id="gSur" display="none" clip-path="url(#surClip)"><g id="gSurT"><rect x="-300" y="-300" width="2200" height="1600" fill="#0d1824"/><rect x="-300" y="-300" width="2200" height="1600" fill="url(#pDots)"/>
+        <g id="surSlab"><g transform="translate(800 500) rotate(45)"><rect x="-120" y="-900" width="260" height="1800" fill="#525c68" opacity=".35"/><rect x="420" y="-900" width="110" height="1800" fill="#7c8390" opacity=".25"/></g>
+          <g transform="translate(800 500) rotate(-45)"><rect x="-640" y="-900" width="340" height="1800" fill="#323e4b" opacity=".4"/></g></g>
+        <g fill="none" stroke-width="3" stroke-linecap="round" opacity=".9">
+          <path d="M180 -60C180 120 330 120 330 300" stroke="#2ECC71"/><path d="M520 -60C520 120 610 120 610 300" stroke="#F1C40F"/>
+          <path d="M1010 -60C1010 120 930 120 930 300" stroke="#3498DB"/><path d="M1440 -60C1440 120 1290 120 1290 300" stroke="#2ECC71"/>
+          <path d="M260 1060C260 840 420 840 420 620" stroke="#E74C3C"/><path d="M760 1060C760 840 820 840 820 620" stroke="#F1C40F"/>
+          <path d="M1350 1060C1350 840 1180 840 1180 620" stroke="#3498DB"/></g></g>
+        <rect id="bandTop" x="0" width="1600" height="7" fill="#080f17"/><rect id="bandBot" x="0" width="1600" height="7" fill="#080f17"/></g>
+      <g id="gSlit" display="none" stroke="#f3f1f6" stroke-width="8" stroke-linecap="square"><line id="slA"/><line id="slB"/></g>
+    </svg>
+    <div id="vig" class="layer"></div>
+    <canvas id="motes"></canvas>
+    <canvas id="fx"></canvas>
+    <div id="intro"></div>
+    <div id="finale">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <g fill="none" stroke-width="3" stroke-linecap="round">
+          <path pathLength="1" d="M32 52 Q14 54 6.9 45.3" stroke="#2ECC71" style="transition-delay:.15s"/>
+          <path pathLength="1" d="M32 52 Q18 42 16.2 31.4" stroke="#3498DB" style="transition-delay:.3s"/>
+          <path pathLength="1" d="M32 52 Q32 38 32 26" stroke="#F1C40F" style="transition-delay:.45s"/>
+          <path pathLength="1" d="M32 52 Q46 42 47.8 31.4" stroke="#E74C3C" style="transition-delay:.6s"/>
+          <path pathLength="1" d="M32 52 Q50 54 57.1 45.3" stroke="#9B59B6" style="transition-delay:.75s"/>
+        </g>
+        <circle cx="6.9" cy="45.3" r="4.2" fill="#2ECC71" style="transition-delay:1.05s"/>
+        <circle cx="16.2" cy="31.4" r="4.2" fill="#3498DB" style="transition-delay:1.15s"/>
+        <circle cx="32" cy="26" r="4.2" fill="#F1C40F" style="transition-delay:1.25s"/>
+        <circle cx="47.8" cy="31.4" r="4.2" fill="#E74C3C" style="transition-delay:1.35s"/>
+        <circle cx="57.1" cy="45.3" r="4.2" fill="#9B59B6" style="transition-delay:1.45s"/>
+        <circle cx="32" cy="52" r="6" fill="none" stroke="currentColor" stroke-width="3" style="transition-delay:0s"/>
+      </svg>
+      <div class="word">Nodestra</div>
+      <div class="tag">Build instruments and songs from nodes — and hear every change.</div>
+    </div>
+    <div id="logo" class="layer">
+      <svg id="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <g fill="none" stroke-width="3" stroke-linecap="round">
+          <path class="lw" d="M32 52 Q14 54 6.9 45.3" stroke="#2ECC71"/>
+          <path class="lw" d="M32 52 Q18 42 16.2 31.4" stroke="#3498DB"/>
+          <path class="lw" d="M32 52 Q32 38 32 26" stroke="#F1C40F"/>
+          <path class="lw" d="M32 52 Q46 42 47.8 31.4" stroke="#E74C3C"/>
+          <path class="lw" d="M32 52 Q50 54 57.1 45.3" stroke="#9B59B6"/>
+        </g>
+        <circle class="ln" cx="6.9" cy="45.3" r="4.2" fill="#2ECC71"/>
+        <circle class="ln" cx="16.2" cy="31.4" r="4.2" fill="#3498DB"/>
+        <circle class="ln" cx="32" cy="26" r="4.2" fill="#F1C40F"/>
+        <circle class="ln" cx="47.8" cy="31.4" r="4.2" fill="#E74C3C"/>
+        <circle class="ln" cx="57.1" cy="45.3" r="4.2" fill="#9B59B6"/>
+        <circle id="cond" cx="32" cy="52" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+      </svg>
+      <div id="word"></div>
+      <div id="tag">Build instruments and songs from nodes — and hear every change.</div>
+    </div>
+    <div id="scrimT" class="layer"></div>
+    <div id="scrimB" class="layer"></div>
+    <div id="caps" class="layer" style="inset:0"></div>
+    <div id="hud">Paused · click or Space to play · ← → scenes</div>
+    <div id="bar"><i></i></div>
+  </div>
+  <div id="loader">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <g fill="none" stroke-width="3" stroke-linecap="round" opacity=".55">
+        <path d="M32 52 Q14 54 6.9 45.3" stroke="#2ECC71"/><path d="M32 52 Q18 42 16.2 31.4" stroke="#3498DB"/>
+        <path d="M32 52 Q32 38 32 26" stroke="#F1C40F"/><path d="M32 52 Q46 42 47.8 31.4" stroke="#E74C3C"/>
+        <path d="M32 52 Q50 54 57.1 45.3" stroke="#9B59B6"/>
+      </g>
+      <circle class="n" cx="6.9" cy="45.3" r="4.2" fill="#2ECC71"/><circle class="n" cx="16.2" cy="31.4" r="4.2" fill="#3498DB"/>
+      <circle class="n" cx="32" cy="26" r="4.2" fill="#F1C40F"/><circle class="n" cx="47.8" cy="31.4" r="4.2" fill="#E74C3C"/>
+      <circle class="n" cx="57.1" cy="45.3" r="4.2" fill="#9B59B6"/>
+      <circle cx="32" cy="52" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+    </svg>
+    <div class="lbar"><i></i></div>
+    <div>Tuning up…</div>
+  </div>
+</div>
+<script src="piano-stage.js"></script>
+<script>
+(() => {
+'use strict';
+/* ============================================================
+   Nodestra — "Signal Flow" ad.
+   Everything on screen is a pure function of one clock `t`, so
+   pause / skip / loop are exact and nothing accumulates state.
+   Stage space: 1600×1000. Screenshot space: 1440×900 CSS px.
+   ============================================================ */
+const W = 1600, H = 1000, PER = 1400, OX = 800, OY = 500, D2R = Math.PI / 180;
+const $ = (s) => document.querySelector(s);
+const stage = $('#stage'), world = $('#world'), cv = $('#fx'), ctx = cv.getContext('2d');
+const COL = {
+  audio: '#2ECC71', signal: '#F1C40F', number: '#3498DB', gate: '#E74C3C', wave: '#9B59B6',
+  gold: '#f2d59b', lime: '#b7e24c', violet: '#a47dff', pink: '#e8457e', white: '#ffffff',
+  amber: '#f5a524', bow: '#f0a35a', silver: '#e6e6e6'
+};
+const mq = matchMedia('(prefers-reduced-motion: reduce)');
+let reduced = mq.matches;
+if (mq.addEventListener) mq.addEventListener('change', (e) => { reduced = e.matches; dirty = true; });
+
+/* ---------- math helpers ---------- */
+const clamp = (x, a = 0, b = 1) => (x < a ? a : x > b ? b : x);
+const frac = (x) => x - Math.floor(x);
+const EZ = {
+  io: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+  o: (x) => 1 - Math.pow(1 - x, 3),
+  i: (x) => x * x * x,
+  l: (x) => x,
+  h: (x) => (x >= 1 ? 1 : 0),
+  o5: (x) => 1 - Math.pow(1 - x, 5),
+  q: (x) => (x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2),
+  back: (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+};
+function rnd(n) { n |= 0; n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n ^= n >>> 16; return (n >>> 0) / 4294967296; }
+const env = (t, a, b, fi = 0.35, fo = 0.35) => Math.min(clamp((t - a) / fi), clamp((b - t) / fo));
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+
+/* ---------- scenes ---------- */
+const SC = [
+  { id: 'intro',    d: 3.6, kind: 'intro' },
+  { id: 'stage',    d: 4.3, kind: 'stage', eb: 'The stage',       cap: 'The lights come up on a grand piano.', ci: 1.6, rest: 3.4 },
+  { id: 'piano',    d: 4.8, kind: 'stage', eb: 'Play the piano', cap: 'Play from your keyboard, or click and tap the keys — chords too.', ci: 1.3, rest: 3.9 },
+  { id: 'nodes',    d: 4.5, col: 'audio',  gl: 'audio',  eb: 'Nodes',         cap: 'Each node here is a real sound, and every wire carries it.', ci: 1.4, rest: 3.6 },
+  { id: 'live',     d: 3.8, col: 'audio',  gl: 'audio',  eb: 'Live previews', cap: 'Waves draw live on the nodes — and Auto-run plays every change.', ci: 0.25, rest: 3.0 },
+  { id: 'info',     d: 4.3, col: 'signal', gl: 'signal', eb: 'In-app docs',   cap: 'Hover a node and ⓘ explains it in plain words.', ci: 1.3, rest: 3.5 },
+  { id: 'menu',     d: 4.3, col: 'pink',   gl: 'audio',  eb: 'Easy Effects',  cap: 'Eight Easy Effects wait in the Add menu, from Stutter to Crunch.', ci: 1.3, rest: 3.5 },
+  { id: 'inside',   d: 4.5, col: 'signal', gl: 'signal', eb: 'Inside a group', cap: 'Open one up and see the nodes that make it.', ci: 1.3, rest: 3.6 },
+  { id: 'path',     d: 4.5, col: 'pink',   gl: 'audio',  eb: 'Menu Path',     cap: 'Give your own groups a Menu Path, and they join the Add menu.', ci: 1.4, rest: 3.7 },
+  { id: 'curves',   d: 5.0, col: 'lime',   gl: 'signal', eb: 'Timeline',      cap: 'Draw curves that move any setting while it plays.', ci: 1.4, rest: 4.2 },
+  { id: 'grid',     d: 4.5, col: 'amber',  gl: 'signal', eb: 'Grid finder',   cap: 'The grid finder suggests tempos, and shows how many notes land on the grid.', ci: 1.1, rest: 3.7 },
+  { id: 'library',  d: 3.8, col: 'number', gl: 'number', eb: 'Library',       cap: 'Your graphs live in a library — folders, tabs, even a folder on your computer.', ci: 1.3, rest: 3.0 },
+  { id: 'physical', d: 5.2, col: 'bow',    gl: 'audio',  eb: 'Instruments',   cap: 'Physically modelled strings and pipes — piano, guitar, violin, flute.', ci: 1.5, rest: 4.4 },
+  { id: 'blip',     d: 6.0, col: 'violet', gl: 'wave',   eb: 'Blip',          cap: 'Blip, a small conductor, shows you what to click, step by step.', ci: 1.4, rest: 2.9 },
+  { id: 'end',      d: 7.5, kind: 'end', rest: 5.0 }
+];
+let acc = 0; SC.forEach((s) => { s.start = acc; acc += s.d; });
+const TOTAL = acc;
+const IDX = {}; SC.forEach((s, i) => { IDX[s.id] = i; });
+const T = (id, l) => SC[IDX[id]].start + l;
+function sceneAt(t) { for (let i = SC.length - 1; i >= 0; i--) if (t >= SC[i].start) return i; return 0; }
+
+/* ---------- images ---------- */
+const IMG = {
+  s01: 'shots/01-stage.jpg', s02: 'shots/02-piano.jpg', s03: 'shots/03-welcome-blip.png', s05: 'shots/05-tutorial-2.png',
+  s06: 'shots/06-graph-effects.png', s07: 'shots/07-info.png', s08: 'shots/08-add-menu.png', s09: 'shots/09-inside-group.png',
+  s10: 'shots/10-group-editor.png', s11: 'shots/11-timeline.png', s12: 'shots/12-grid-finder.png', s13: 'shots/13-violin.png'
+};
+
+
+/* ---------- no-image variant: UI shots are the real app DOM (ui/*.html) ---------- */
+const UI_DOM = {
+  'shots/03-welcome-blip.png': 'ui/03-welcome-blip.html', 'shots/05-tutorial-2.png': 'ui/05-tutorial-2.html',
+  'shots/06-graph-effects.png': 'ui/06-graph-effects.html', 'shots/07-info.png': 'ui/07-info.html',
+  'shots/08-add-menu.png': 'ui/08-add-menu.html', 'shots/09-inside-group.png': 'ui/09-inside-group.html',
+  'shots/10-group-editor.png': 'ui/10-group-editor.html', 'shots/11-timeline.png': 'ui/11-timeline.html',
+  'shots/12-grid-finder.png': 'ui/12-grid-finder.html', 'shots/13-violin.png': 'ui/13-violin.html'
+};
+const uiLoads = [];
+function shotEl(src, cls) {
+  if (src === IMG.s01) return liveHost('s01');
+  if (src === IMG.s02) return liveHost('s02');
+  const dom = UI_DOM[src];
+  if (!dom) { const im = document.createElement('img'); im.alt = ''; im.draggable = false; im.decoding = 'async'; im.src = src; if (cls) im.className = cls; return im; }
+  const f = document.createElement('iframe');
+  f.src = dom; f.width = 1440; f.height = 900; f.tabIndex = -1;
+  f.setAttribute('scrolling', 'no'); f.setAttribute('aria-hidden', 'true'); f.setAttribute('title', '');
+  if (cls) f.className = cls;
+  uiLoads.push(new Promise((res) => f.addEventListener('load', res, { once: true })));
+  return f;
+}
+
+/* ---------- live stage: one WebGL canvas shared by the 01 / 02 panels ---------- */
+const LV_ORDER = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k', 'o', 'l', 'p', ';'];
+const LV_WHITE = new Set([0, 2, 4, 5, 7, 9, 11, 12, 14, 16]);
+function lvKeysHtml() {
+  const whites = LV_ORDER.filter((k, i) => LV_WHITE.has(i)), blacks = LV_ORDER.filter((k, i) => !LV_WHITE.has(i));
+  let h = '';
+  whites.forEach((k, i) => { h += `<div class="pk w" data-k="${k}" style="left:${i * 34}px">${k}</div>`; });
+  blacks.forEach((k) => { const si = LV_ORDER.indexOf(k); const before = whites.filter((w) => LV_ORDER.indexOf(w) < si).length; h += `<div class="pk b" data-k="${k}" style="left:${before * 34 - 11}px">${k}</div>`; });
+  return h;
+}
+function liveHost(kind) {
+  const host = document.createElement('div'); host.className = 'livehost';
+  host.innerHTML = kind === 's01'
+    ? `<div class="lv-gate"><p class="eyebrow">nodestra</p><div class="row"><span class="start">Click to start audio</span><span class="piano">🎹 Play the piano</span></div><p class="note">Browsers require a real click before any sound can play.</p></div>`
+    : `<span class="lv-back">‹ Back</span><div class="lv-piano"><p class="hint">Play with your keyboard, or click and tap the keys</p><div class="lv-keys">${lvKeysHtml()}</div><p class="oct">Octave <b>C4</b> · <span>,</span> and <span>.</span> shift the octave</p><span class="enter">Enter the app ›</span></div>`;
+  LIVE_HOSTS[kind].push(host);
+  return host;
+}
+const LIVE_HOSTS = { s01: [], s02: [] };
+const liveCanvas = document.createElement('canvas');
+const liveStage = window.NodestraStage.createStageScene(liveCanvas, { reducedMotion: false });
+liveStage.resize(1440, 900);
+// The piano beat plays C, E, G (keys A, D, G — the lit keys of the original 02 shot), then the chord.
+const LV_NOTES = [['a', 39], ['d', 43], ['g', 46]];
+const lvHeld = new Map();
+let lvLive = null, lvParent = null;
+function liveSync(t) {
+  const live = t >= T('piano', 0);
+  if (live !== lvLive) { liveStage.setLive(live); lvLive = live; }
+  const parent = t < T('piano', 0.6) ? LIVE_HOSTS.s01[0] : t < T('physical', 0.3) ? LIVE_HOSTS.s02[0] : LIVE_HOSTS.s02[1];
+  if (parent && parent !== lvParent) { parent.insertBefore(liveCanvas, parent.firstChild); lvParent = parent; }
+  const lp = t - T('piano', 0);
+  LV_NOTES.forEach(([k, note], i) => {
+    const on = (lp >= 1.7 + i * 0.45 && lp < 2.1 + i * 0.45) || (lp >= 3.3 && lp < 4.6);
+    if (on !== !!lvHeld.get(k)) {
+      lvHeld.set(k, on);
+      if (live) liveStage.setLiveKey(note, on);
+      document.querySelectorAll(`.lv-keys .pk[data-k="${k}"]`).forEach((el) => el.classList.toggle('down', on));
+    }
+  });
+}
+
+/* ---------- panels (segments) with per-property keyframe tracks ---------- */
+const SEGS = [];
+const DEF = { u: 720, v: 450, x: 800, y: 490, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], vb: 0 };
+function seg(key, keys) {
+  const el = document.createElement('div'); el.className = 'panel';
+  const im = shotEl(IMG[key]);
+  el.appendChild(im); world.appendChild(el);
+  const tracks = {}; let t0 = 1e9, t1 = -1e9;
+  for (const [t, props, ez] of keys) {
+    t0 = Math.min(t0, t); t1 = Math.max(t1, t);
+    for (const k in props) (tracks[k] || (tracks[k] = [])).push([t, props[k], ez || 'io']);
+  }
+  for (const k in tracks) tracks[k].sort((a, b) => a[0] - b[0]);
+  const sg = { key, el, tracks, t0, t1, cur: null, vis: false, cache: {} };
+  SEGS.push(sg); return sg;
+}
+function lerp(a, b, k) { if (typeof a === 'number') return a + (b - a) * k; return a.map((v, i) => v + (b[i] - v) * k); }
+function track(tr, t) {
+  const n = tr.length;
+  if (t <= tr[0][0]) return tr[0][1];
+  if (t >= tr[n - 1][0]) return tr[n - 1][1];
+  for (let i = 1; i < n; i++) {
+    if (t <= tr[i][0]) {
+      const a = tr[i - 1], b = tr[i], span = b[0] - a[0];
+      return lerp(a[1], b[1], span <= 0 ? 1 : EZ[b[2]]((t - a[0]) / span));
+    }
+  }
+  return tr[n - 1][1];
+}
+function withTrig(p) {
+  const a = p.rz * D2R, b = p.ry * D2R, c = p.rx * D2R;
+  p.cz = Math.cos(a); p.sz = Math.sin(a); p.cy = Math.cos(b); p.sy = Math.sin(b); p.cx = Math.cos(c); p.sx = Math.sin(c);
+  return p;
+}
+function poseAt(sg, t) {
+  const p = {};
+  for (const k in DEF) { const tr = sg.tracks[k]; p[k] = tr ? track(tr, t) : DEF[k]; }
+  p.in = t >= sg.t0 && t <= sg.t1;
+  return withTrig(p);
+}
+const IDP = withTrig({ u: 0, v: 0, x: 0, y: 0, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], in: true });
+/* Same math as the CSS: translate3d · rotateX · rotateY · rotateZ · scale · translate(-u,-v), then the
+   parent's perspective (1400px, origin 800/500). Lets particles sit on exact screenshot pixels. */
+function proj(p, u, v) {
+  const x = (u - p.u) * p.s, y = (v - p.v) * p.s;
+  const x1 = x * p.cz - y * p.sz, y1 = x * p.sz + y * p.cz;
+  const x2 = x1 * p.cy, z2 = -x1 * p.sy;
+  const y3 = y1 * p.cx - z2 * p.sx, z3 = y1 * p.sx + z2 * p.cx;
+  const X = x2 + p.x, Y = y3 + p.y, Z = z3 + p.z, f = PER / (PER - Z);
+  return [OX + (X - OX) * f, OY + (Y - OY) * f, f];
+}
+function applySeg(sg, p, o) {
+  const vis = p.in && o > 0.003, c = sg.cache;
+  if (vis !== sg.vis) { sg.el.style.visibility = vis ? 'visible' : 'hidden'; sg.vis = vis; }
+  if (!vis) return;
+  const tf = `translate3d(${p.x.toFixed(2)}px,${p.y.toFixed(2)}px,${p.z.toFixed(1)}px) rotateX(${p.rx.toFixed(3)}deg) rotateY(${p.ry.toFixed(3)}deg) rotateZ(${p.rz.toFixed(3)}deg) scale(${p.s.toFixed(4)}) translate(${(-p.u).toFixed(2)}px,${(-p.v).toFixed(2)}px)`;
+  if (tf !== c.tf) { sg.el.style.transform = tf; c.tf = tf; }
+  const op = o.toFixed(3); if (op !== c.op) { sg.el.style.opacity = op; c.op = op; }
+  const blur = reduced ? 0 : (p.b + Math.min(10, Math.abs(p.z) / 110)) / Math.max(0.35, p.s);
+  const parts = [];
+  if (blur > 0.25) parts.push(`blur(${blur.toFixed(2)}px)`);
+  if (p.l < 0.995) parts.push(`brightness(${(0.22 + 0.78 * p.l).toFixed(3)})`);
+  if (p.vb > 0.5 && !reduced) parts.push(`url(#fV${p.vb >= 18 ? 26 : p.vb >= 6 ? 10 : 3})`);
+  const fl = parts.length ? parts.join(' ') : 'none';
+  if (fl !== c.fl) { sg.el.style.filter = fl; c.fl = fl; }
+  const cc = p.c;
+  const cp = cc[0] + cc[1] + cc[2] + cc[3] > 0.5 ? `inset(${cc[0].toFixed(1)}px ${cc[1].toFixed(1)}px ${cc[2].toFixed(1)}px ${cc[3].toFixed(1)}px round 12px)` : 'none';
+  if (cp !== c.cp) { sg.el.style.clipPath = cp; sg.el.style.webkitClipPath = cp; c.cp = cp; }
+  const zi = String(3000 + Math.round(p.z));
+  if (zi !== c.zi) { sg.el.style.zIndex = zi; c.zi = zi; }
+}
+
+/* ---------- particle drawing ---------- */
+const SPR = {};
+function spr(col, soft) {
+  const key = col + (soft ? 's' : '');
+  if (SPR[key]) return SPR[key];
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32), [r, gg, b] = hexRgb(col);
+  if (soft) {
+    gr.addColorStop(0, `rgba(${r},${gg},${b},.55)`); gr.addColorStop(0.5, `rgba(${r},${gg},${b},.16)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  } else {
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.16, `rgba(${r},${gg},${b},.95)`);
+    gr.addColorStop(0.42, `rgba(${r},${gg},${b},.28)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  }
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return (SPR[key] = c);
+}
+let budget = 0;
+const BUDGET = 1500;
+function dot(x, y, r, col, a, soft) {
+  if (a <= 0.004 || r <= 0.15) return;
+  if (x < -r || y < -r || x > W + r || y > H + r) return;
+  if (++budget > BUDGET && !soft) return;
+  ctx.globalAlpha = a > 1 ? 1 : a;
+  ctx.drawImage(spr(col, soft), x - r, y - r, r * 2, r * 2);
+}
+function line(a, b, col, lw, al) {
+  if (al <= 0.004) return;
+  ctx.globalAlpha = Math.min(1, al); ctx.strokeStyle = col; ctx.lineWidth = lw;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+}
+function polyLen(q) { const L = []; let tot = 0; for (let i = 0; i < 4; i++) { const a = q[i], b = q[(i + 1) % 4]; const d = Math.hypot(b[0] - a[0], b[1] - a[1]); L.push(d); tot += d; } return [L, tot]; }
+function strokePoly(q, col, lw, al, k = 1) {
+  if (al <= 0.004) return;
+  ctx.globalAlpha = Math.min(1, al); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(q[0][0], q[0][1]);
+  if (k >= 1) { for (let i = 1; i < 4; i++) ctx.lineTo(q[i][0], q[i][1]); ctx.closePath(); }
+  else {
+    const [L, tot] = polyLen(q); let rem = tot * k;
+    for (let i = 0; i < 4 && rem > 0; i++) {
+      const a = q[i], b = q[(i + 1) % 4], f = Math.min(1, rem / (L[i] || 1));
+      ctx.lineTo(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f); rem -= L[i];
+    }
+  }
+  ctx.stroke();
+}
+function perim(q, s) {
+  const [L, tot] = polyLen(q); let d = frac(s) * tot;
+  for (let i = 0; i < 4; i++) { if (d <= L[i]) { const a = q[i], b = q[(i + 1) % 4], f = d / (L[i] || 1); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; } d -= L[i]; }
+  return q[0];
+}
+function bz(a, b, c, d, t) {
+  const m = 1 - t;
+  return [
+    m * m * m * a[0] + 3 * m * m * t * b[0] + 3 * m * t * t * c[0] + t * t * t * d[0],
+    m * m * m * a[1] + 3 * m * m * t * b[1] + 3 * m * t * t * c[1] + t * t * t * d[1],
+    3 * m * m * (b[0] - a[0]) + 6 * m * t * (c[0] - b[0]) + 3 * t * t * (d[0] - c[0]),
+    3 * m * m * (b[1] - a[1]) + 6 * m * t * (c[1] - b[1]) + 3 * t * t * (d[1] - c[1])
+  ];
+}
+/* A point spec: [x,y] in stage space, or {seg,u,v} = a pixel of a screenshot wherever that panel is now. */
+function at(spec) { if (Array.isArray(spec)) return spec; return proj(spec.seg.cur, spec.u, spec.v); }
+
+/* ---------- effects (each a pure function of t inside its window) ---------- */
+const FX = [];
+const fx = (t0, t1, fn) => FX.push({ t0, t1, fn });
+let seedN = 1;
+
+/* A glowing wire stream that swoops from one point to another and "plugs in" with a spark. */
+function stream(o) {
+  const n = o.n || 80, dur = o.dur, lift = o.lift ?? 140, width = o.width ?? 14, seed = seedN++ * 131, cols = o.colors, size = o.size || 1;
+  const sparkCols = o.sparkCols || cols;
+  fx(o.t0, o.t0 + dur + (o.spark === false ? 0.35 : 1.15), (t) => {
+    const tau = t - o.t0, A = at(o.from), B = at(o.to);
+    const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    const c1 = [A[0] + dx * 0.28 + nx * lift, A[1] + dy * 0.28 + ny * lift];
+    const c2 = [A[0] + dx * 0.74 + nx * lift * 0.4, A[1] + dy * 0.74 + ny * lift * 0.4];
+    for (let j = 0; j < n; j++) {
+      const r1 = rnd(seed + j * 3 + 1), r2 = rnd(seed + j * 3 + 2), r3 = rnd(seed + j * 3 + 3);
+      const d = r1 * r1 * 0.45 * dur, q = (tau - d) / dur;
+      if (q <= 0) continue;
+      let a, p;
+      if (q >= 1) { p = 1; a = 1 - ((q - 1) * dur) / 0.22; if (a <= 0) continue; }
+      else { p = EZ.q(q); a = Math.min(1, q * 8); }
+      const pt = bz(A, c1, c2, B, p), tl = Math.hypot(pt[2], pt[3]) || 1, px = -pt[3] / tl, py = pt[2] / tl;
+      const e = Math.sin(Math.PI * p);
+      const off = ((r2 - 0.5) * 2 * width + Math.sin(p * 11 + r3 * 6.283 + tau * 4) * width * 0.6) * e;
+      const rr = (2.2 + r3 * 3.2) * (0.55 + 0.6 * e) * size;
+      dot(pt[0] + px * off, pt[1] + py * off, rr * 2.6, cols[j % cols.length], a * (0.32 + 0.62 * (1 - r1)));
+    }
+    const hq = tau / dur;
+    if (hq > 0 && hq < 1) {
+      const pt = bz(A, c1, c2, B, EZ.q(hq));
+      dot(pt[0], pt[1], 34 * size, cols[0], 0.45, true);
+      dot(pt[0], pt[1], 10 * size, '#ffffff', 0.85);
+    }
+    if (o.spark !== false) { const age = tau - dur; if (age > 0 && age < 1.15) spark(B[0], B[1], age, sparkCols, seed, o.sparkScale || 1); }
+  });
+}
+function spark(x, y, age, cols, seed, sc) {
+  const k = age / 1.15;
+  dot(x, y, (70 + 90 * age) * sc, cols[0], (1 - k) * (1 - k) * 0.9, true);
+  dot(x, y, 16 * sc, '#ffffff', Math.max(0, 1 - age / 0.35));
+  ctx.globalAlpha = Math.pow(Math.max(0, 1 - k), 2) * 0.7; ctx.strokeStyle = cols[0]; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, 6 + age * 100 * sc, 0, 6.2832); ctx.stroke();
+  const n = sc < 0.5 ? 16 : 34;
+  for (let j = 0; j < n; j++) {
+    const ang = rnd(seed * 7 + j * 2 + 11) * 6.2832, sp = (120 + rnd(seed * 7 + j * 2 + 12) * 380) * sc;
+    const dist = (sp * (1 - Math.exp(-age * 4.2))) / 4.2;
+    dot(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist + 38 * age * age, 3.5 + rnd(seed + j) * 3, cols[j % cols.length], Math.pow(1 - k, 1.5));
+  }
+}
+function burstAt(spec, t0, cols, sc) { const seed = seedN++ * 97; fx(t0, t0 + 1.15, (t) => { const p = at(spec); spark(p[0], p[1], t - t0, cols, seed, sc); }); }
+
+/* Paths in screenshot space: React Flow–style bezier wires, or smoothed polylines. */
+function wire(a, b) { const dx = b[0] - a[0]; const k = dx >= 0 ? Math.max(dx * 0.5, 8) : 0.25 * 25 * Math.sqrt(-dx); return { bz: [a, [a[0] + k, a[1]], [b[0] - k, b[1]], b] }; }
+function smooth(pts, n = 8) {
+  const out = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    for (let k = 0; k < n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      out.push([0, 1].map((d) => 0.5 * (2 * p1[d] + (-p0[d] + p2[d]) * t + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (-p0[d] + 3 * p1[d] - 3 * p2[d] + p3[d]) * t3)));
+    }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+function samplePath(pth) {
+  let pts;
+  if (pth.bz) { pts = []; for (let i = 0; i <= 40; i++) { const q = bz(pth.bz[0], pth.bz[1], pth.bz[2], pth.bz[3], i / 40); pts.push([q[0], q[1]]); } }
+  else pts = pth.raw ? pth.pts : smooth(pth.pts);
+  const C = [0];
+  for (let i = 1; i < pts.length; i++) C.push(C[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  pth.P = pts; pth.C = C; pth.len = C[C.length - 1] || 1;
+  return pth;
+}
+function along(pth, d) {
+  const C = pth.C; let lo = 0, hi = C.length - 1;
+  if (d <= 0) return pth.P[0];
+  if (d >= C[hi]) return pth.P[hi];
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (C[m] < d) lo = m; else hi = m; }
+  const f = (d - C[lo]) / (C[hi] - C[lo] || 1), a = pth.P[lo], b = pth.P[hi];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+/* Particles flowing along real wires. Phase uses absolute t so twin panels (06/07) line up. */
+function flow(o) {
+  o.paths.forEach(samplePath);
+  const speed = o.speed || 110, gap = o.gap || 7, size = o.size || 2.1, fi = o.fi ?? 0.6, fo = o.fo ?? 0.45;
+  fx(o.t0, o.t1, (t) => {
+    const p = o.seg ? o.seg.cur : IDP;
+    const e = env(t, o.t0, o.t1, fi, fo) * p.o * p.l * (o.a ?? 1);
+    if (e <= 0.01) return;
+    o.paths.forEach((pth, pi) => {
+      const n = Math.max(3, Math.round(pth.len / gap));
+      for (let j = 0; j < n; j++) {
+        const s = frac(j / n + (rnd(pi * 997 + j * 7) * 0.6) / n + (t * speed) / pth.len);
+        const q = along(pth, s * pth.len), P = proj(p, q[0], q[1]);
+        const r = size * p.s * P[2];
+        let boost = 0;
+        if (o.surge) { const ph = frac((q[0] - t * 300) / 1100); boost = Math.exp(-Math.pow((ph - 0.5) * 9, 2)); }
+        const edge = Math.min(1, s * 8, (1 - s) * 8);
+        dot(P[0], P[1], r * (2.6 + boost * 2.2), pth.col, e * edge * (0.42 + 0.58 * boost));
+        if (boost > 0.5) dot(P[0], P[1], r * 1.1, '#ffffff', e * edge * (boost - 0.5) * 1.2);
+      }
+    });
+  });
+}
+/* Highlight a real piece of UI: a projected outline that draws itself in, with a travelling light. */
+function box(o) {
+  fx(o.t0, o.t1, (t) => {
+    const p = o.seg.cur, e = env(t, o.t0, o.t1, 0.35, 0.4) * p.o;
+    if (e <= 0.01) return;
+    const pad = o.pad ?? 4, [u0, v0, u1, v1] = o.rect;
+    const q = [proj(p, u0 - pad, v0 - pad), proj(p, u1 + pad, v0 - pad), proj(p, u1 + pad, v1 + pad), proj(p, u0 - pad, v1 + pad)];
+    const k = EZ.o(clamp((t - o.t0) / 0.6));
+    strokePoly(q, o.col, 9, e * 0.16, k);
+    strokePoly(q, o.col, 2, e * 0.9, k);
+    const sp = perim(q, (t - o.t0) * 0.42 + (o.ph || 0));
+    dot(sp[0], sp[1], 14, o.col, e * 0.85);
+    dot(sp[0], sp[1], 4.5, '#ffffff', e * 0.9);
+  });
+}
+function ring(o) {
+  fx(o.t0, o.t1, (t) => {
+    const p = o.seg.cur, e = env(t, o.t0, o.t1, 0.3, 0.4) * p.o;
+    if (e <= 0.01) return;
+    const P = proj(p, o.u, o.v), R = o.r * p.s * P[2], pu = 0.5 + 0.5 * Math.sin((t - o.t0) * 5);
+    dot(P[0], P[1], R * 2.6, o.col, e * 0.35, true);
+    ctx.globalAlpha = e * (0.55 + 0.35 * pu); ctx.strokeStyle = o.col; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(P[0], P[1], R * (1 + 0.14 * pu), 0, 6.2832); ctx.stroke();
+  });
+}
+/* Notes rising off the lit piano keys. */
+function rise(o) {
+  const life = o.life || 1.8, n = o.n || 22, seed = seedN++ * 53;
+  fx(o.t0, o.t0 + life + 0.3, (t) => {
+    const p = o.seg.cur, tau = t - o.t0;
+    const K = proj(p, o.u, o.v);
+    dot(K[0], K[1], 46 * p.s * K[2], o.col, Math.max(0, 1 - tau / 0.5) * 0.8, true);
+    for (let j = 0; j < n; j++) {
+      const r1 = rnd(seed + j * 4), r2 = rnd(seed + j * 4 + 1), r3 = rnd(seed + j * 4 + 2);
+      const ag = tau - r1 * 0.25;
+      if (ag < 0 || ag > life) continue;
+      const k = ag / life;
+      const u = o.u + (r2 - 0.5) * 26 + Math.sin(ag * 3 + r3 * 6) * 12 * k;
+      const v = o.v - 18 - ag * (55 + r3 * 75);
+      const P = proj(p, u, v);
+      dot(P[0], P[1], (3 + r2 * 4) * p.s * P[2], o.col, (1 - k) * Math.min(1, k * 10) * 0.9 * p.o);
+    }
+  });
+}
+/* Slow floating motes inside a region of a screenshot (the stage's own spotlight dust). */
+function dust(o) {
+  const seed = seedN++ * 71, [x0, y0, x1, y1] = o.rect, w = x1 - x0, h = y1 - y0;
+  fx(o.t0, o.t1, (t) => {
+    const p = o.seg.cur, e = env(t, o.t0, o.t1, 0.8, 0.6) * p.o;
+    if (e <= 0.01) return;
+    for (let j = 0; j < o.n; j++) {
+      const r1 = rnd(seed + j * 5), r2 = rnd(seed + j * 5 + 1), r3 = rnd(seed + j * 5 + 2), r4 = rnd(seed + j * 5 + 3);
+      const u = x0 + r1 * w + Math.sin(t * 0.4 + r3 * 6) * 12;
+      const v = y0 + frac(r2 - (t * (o.speed || 10) * (0.5 + r4)) / h) * h;
+      const tw = 0.5 + 0.5 * Math.sin(t * (1 + r3 * 2) + r4 * 6);
+      const P = proj(p, u, v);
+      dot(P[0], P[1], (1.6 + r3 * 2.6) * p.s * P[2] * 1.9, o.col, e * tw * 0.6);
+    }
+  });
+}
+/* The edges of a panel light up when a stream plugs into it. */
+function edgeFlash(o) {
+  fx(o.t0, o.t0 + 1.2, (t) => {
+    const p = o.seg.cur, k = (t - o.t0) / 1.2, c = p.c;
+    const r = [c[3], c[0], 1440 - c[1], 900 - c[2]];
+    const q = [proj(p, r[0], r[1]), proj(p, r[2], r[1]), proj(p, r[2], r[3]), proj(p, r[0], r[3])];
+    const a = (1 - k) * (1 - k) * p.o;
+    strokePoly(q, o.col, 14, a * 0.18); strokePoly(q, o.col, 2, a * 0.8);
+  });
+}
+/* A single comet that runs once along a path in a screenshot. */
+function trace(o) {
+  const pth = samplePath({ pts: o.pts, raw: true });
+  fx(o.t0, o.t0 + o.dur + 0.4, (t) => {
+    const p = o.seg.cur, k = clamp((t - o.t0) / o.dur), fade = 1 - clamp((t - o.t0 - o.dur) / 0.4);
+    for (let j = 0; j < 18; j++) {
+      const d = EZ.io(k) * pth.len - j * 5;
+      if (d < 0) break;
+      const q = along(pth, d), P = proj(p, q[0], q[1]);
+      dot(P[0], P[1], (j === 0 ? 9 : 6 - j * 0.25) * p.s * P[2], j === 0 ? '#ffffff' : o.col, fade * p.o * (1 - j / 18));
+    }
+  });
+}
+
+/* ============================================================
+   THE SHOTS — coordinates are real pixels of each screenshot
+   (1440×900 CSS px), measured from the 2880×1800 captures.
+   ============================================================ */
+
+/* S0 — the stage (01) rises out of the void; four socket-coloured streams plug into the piano. */
+const s01 = seg('s01', [
+  [T('stage', 0), { u: 720, v: 450, x: 800, y: 470, z: -1600, s: 1.0, ry: -12, rx: 8, o: 0, l: 0.08, b: 0 }],
+  [T('stage', 0.7), { o: 1 }, 'o'],
+  [T('stage', 1.35), { l: 0.08 }],
+  [T('stage', 1.6), { z: 0, ry: 0, rx: 0, s: 1.0, u: 720, v: 450 }, 'o'],
+  [T('stage', 2.0), { l: 1 }, 'o'],
+  [T('stage', 4.3), { s: 1.07, u: 690, v: 520 }],
+  [T('piano', 0.3), { o: 1, b: 0 }],
+  [T('piano', 1.15), { s: 3.4, u: 608, v: 582, o: 0, b: 2 }, 'i']
+]);
+const PIANO01 = { seg: s01, u: 668, v: 548 };
+[[[-60, 190], COL.audio, 170], [[380, -70], COL.signal, -120], [[1240, -70], COL.number, 140], [[1670, 270], COL.gate, -160]].forEach(([from, col, lift], i) =>
+  stream({ t0: T('stage', 0.15 + i * 0.04), dur: 1.2 - i * 0.04, from, to: PIANO01, colors: [col, col, '#ffffff'], n: 70, lift, width: 12,
+    spark: i === 3, sparkCols: [COL.gold, COL.audio, COL.signal, COL.number, COL.gate], sparkScale: 1.1 }));
+edgeFlash({ seg: s01, t0: T('stage', 1.35), col: COL.gold });
+dust({ seg: s01, rect: [520, 190, 900, 600], n: 60, col: COL.gold, t0: T('stage', 1.4), t1: T('piano', 1.1), speed: 8 });
+
+/* S1 — "Play the piano" (02): the camera glides in to the keys, the lit C–E–G chord sings. */
+const s02 = seg('s02', [
+  [T('piano', 0.25), { u: 722, v: 497, x: 800, y: 470, s: 0.6, o: 0, z: 0 }],
+  [T('piano', 0.95), { o: 1 }],
+  [T('piano', 1.35), { s: 1.111, u: 720, v: 470 }, 'o'],
+  [T('piano', 4.8), { s: 1.3, u: 700, v: 560 }],
+  [T('nodes', 0), { z: 0, x: 800, ry: 0, o: 1, b: 0, l: 1 }],
+  [T('nodes', 1.1), { z: -1000, x: 420, ry: 28, o: 0, b: 4, l: 0.35 }, 'i']
+]);
+const KEYS = [[565, 760], [634, 760], [702, 760]]; // the lit A / D / G keys (C, E, G)
+KEYS.forEach(([u, v], i) => rise({ seg: s02, u, v, t0: T('piano', 1.7 + i * 0.45), col: COL.gold, n: 20 }));
+KEYS.forEach(([u, v]) => rise({ seg: s02, u, v, t0: T('piano', 3.3), col: COL.gold, n: 30, life: 2.0 }));
+dust({ seg: s02, rect: [150, 0, 1300, 520], n: 70, col: COL.gold, t0: T('piano', 0.8), t1: T('nodes', 1.0), speed: 7 });
+
+/* S2/S3 — the effects graph (06). Notes become wires; audio flows along the real wires. */
+const s06 = seg('s06', [
+  [T('nodes', 0), { u: 720, v: 450, x: 1000, y: 520, z: -1100, s: 0.95, ry: -24, rx: 6, o: 0, l: 0.15 }],
+  [T('nodes', 0.35), { o: 1 }],
+  [T('nodes', 1.15), { l: 0.15 }],
+  [T('nodes', 1.3), { x: 800, y: 490, z: 0, ry: -3, rx: 1.5, s: 0.95, u: 720, v: 450 }, 'o'],
+  [T('nodes', 1.7), { l: 1 }, 'o'],
+  [T('nodes', 4.5), { s: 1.0, u: 740, v: 445, ry: 1.5, rx: 0 }],
+  [T('live', 3.8), { s: 1.25, u: 880, v: 400, ry: 0 }],
+  [T('info', 1.0), { o: 1 }],
+  [T('info', 1.45), { o: 0 }]
+]);
+const OSCP = [[379, 212], [379, 418], [379, 623]]; // each Oscillator's live wave preview
+KEYS.forEach(([u, v], i) => stream({ t0: T('nodes', 0.05 + i * 0.07), dur: 1.05, from: { seg: s02, u, v }, to: { seg: s06, u: OSCP[i][0], v: OSCP[i][1] },
+  colors: [COL.audio, COL.gold, COL.audio], n: 70, lift: -200 + i * 70, width: 10, sparkScale: 0.7 }));
+edgeFlash({ seg: s06, t0: T('nodes', 1.15), col: COL.audio });
+// Oscillator ×3 → Mix → Wobble → Stutter → Big Space → Gain → Render (socket to socket)
+const W06 = [[[445, 277], [492, 515]], [[445, 482], [492, 515]], [[445, 688], [492, 515]], [[624, 482], [645, 466]],
+  [[776, 433], [798, 466]], [[929, 433], [950, 466]], [[1081, 433], [1103, 515]], [[1234, 482], [1256, 500]]];
+const mk06 = () => W06.map((w) => Object.assign(wire(w[0], w[1]), { col: COL.audio }));
+flow({ seg: s06, paths: mk06(), t0: T('nodes', 1.2), t1: T('info', 1.25), gap: 5, surge: true, fo: 0.2 });
+// S3: live previews, the Render meter, and Auto-run
+box({ seg: s06, rect: [313, 194, 445, 230], col: COL.audio, t0: T('live', 0.1), t1: T('live', 3.6) });
+box({ seg: s06, rect: [313, 400, 445, 436], col: COL.audio, t0: T('live', 0.3), t1: T('live', 3.6), ph: 0.3 });
+box({ seg: s06, rect: [313, 605, 445, 642], col: COL.audio, t0: T('live', 0.5), t1: T('live', 3.6), ph: 0.6 });
+box({ seg: s06, rect: [492, 400, 625, 436], col: COL.audio, t0: T('live', 0.7), t1: T('live', 3.6), ph: 0.1 });
+box({ seg: s06, rect: [1102, 400, 1234, 436], col: COL.audio, t0: T('live', 0.9), t1: T('live', 3.6), ph: 0.5 });
+box({ seg: s06, rect: [1255, 407, 1386, 444], col: COL.signal, t0: T('live', 1.2), t1: T('live', 3.6), ph: 0.8 });
+box({ seg: s06, rect: [617, 8, 736, 36], col: COL.audio, t0: T('live', 1.9), t1: T('live', 3.7) });
+
+/* S4 — ⓘ docs (07): identical graph, now with Stutter's tooltip. A signal stream "hovers" the ⓘ. */
+const s07 = seg('s07', [
+  [T('info', 0.85), { u: 880, v: 400, x: 800, y: 490, s: 1.25, o: 0 }],
+  [T('info', 1.25), { o: 1 }],
+  [T('info', 1.45), { s: 1.25, u: 880, v: 400 }],
+  [T('info', 4.3), { s: 2.05, u: 845, v: 392 }],
+  [T('menu', 0), { z: 0, x: 800, ry: 0, o: 1, b: 0, l: 1 }],
+  [T('menu', 1.1), { z: -800, x: 330, ry: 30, o: 0, b: 4, l: 0.35 }, 'i']
+]);
+stream({ t0: T('info', 0.05), dur: 0.8, from: { seg: s06, u: 624, v: 482 }, to: { seg: s06, u: 841, v: 408 }, colors: [COL.signal, COL.signal, '#ffffff'], n: 50, lift: -130, width: 8, sparkScale: 0.6 });
+flow({ seg: s07, paths: mk06(), t0: T('info', 1.05), t1: T('menu', 1.0), gap: 5, surge: true, fi: 0.2 });
+ring({ seg: s07, u: 841, v: 408, r: 9, col: COL.signal, t0: T('info', 1.1), t1: T('menu', 0.5) });
+box({ seg: s07, rect: [681, 346, 1001, 397], col: COL.silver, t0: T('info', 1.45), t1: T('menu', 0.6) });
+
+/* S5 — the Add menu (08): Add Node ▸ Easy Effects, eight effects light up one by one. */
+const s08 = seg('s08', [
+  [T('menu', 0), { u: 720, v: 450, x: 1250, y: 500, z: -1200, s: 1.0, ry: -28, rx: 4, o: 0, l: 0.15 }],
+  [T('menu', 0.35), { o: 1 }],
+  [T('menu', 1.05), { l: 0.15 }],
+  [T('menu', 1.3), { x: 800, y: 490, z: 0, ry: -2, rx: 0, s: 1.0, u: 720, v: 450 }, 'o'],
+  [T('menu', 1.6), { l: 1 }, 'o'],
+  [T('menu', 4.3), { s: 1.85, u: 1040, v: 440, ry: 0 }],
+  [T('inside', 0.55), { o: 1 }],
+  [T('inside', 1.0), { s: 4.2, u: 951, v: 429, o: 0 }, 'i']
+]);
+stream({ t0: T('menu', 0.05), dur: 1.0, from: { seg: s07, u: 841, v: 372 }, to: { seg: s08, u: 1199, v: 354 }, colors: [COL.pink, COL.signal, '#ffffff'], n: 80, lift: 170, width: 12, sparkScale: 0.8 });
+edgeFlash({ seg: s08, t0: T('menu', 1.05), col: COL.pink });
+box({ seg: s08, rect: [904, 346, 1094, 536], col: COL.pink, t0: T('menu', 1.5), t1: T('inside', 0.4) });
+const CASC = [COL.audio, COL.signal, COL.number, COL.gate, COL.wave, COL.pink, COL.audio, COL.signal];
+[357, 381, 405, 429, 454, 477, 501, 526].forEach((v, i) => burstAt({ seg: s08, u: 922, v }, T('menu', 1.75 + i * 0.15), [CASC[i], '#ffffff'], 0.25));
+
+/* Slime effect 12, measured: whip-tilt (ty px/frame @960 wide, roll °, vertical blur σ), then the push. */
+const FPSA = 24000 / 1001, BFA = FPSA * 60 / 172;
+const WHIP_TY = [4, 8, 13, 36, 91].map((v) => v * 1600 / 960), WHIP_R = [0, 0, -0.25, -1.34, -3.72], WHIP_S = [0, 0, 3, 10, 26];
+const PUSH = [1.0527, 1.0151, 1.0356, 1.0155, 1.0130, 1.0085, 1.0046, 1.0044, 1.0032, 1.0057, 1.0017, 1.0013, 1.0004, 1.0007, 1.0006, 1.0397, 1.0004, 1.0001, 1.0328, 1.0002, 1.0];
+const PSTEP = { 6: 1, 9: 1, 12: 1, 15: 2, 18: 2 };
+const TCV = T('curves', 0), fr = (n) => TCV + n / FPSA, EXPT = fr(4 * BFA), EXPD = 8 / FPSA;
+const WHIP10 = [[TCV - 5 / FPSA - 0.001, { y: 490, rz: 0, vb: 0, o: 1 }, 'l']];
+{ let y = 490, r = 0;
+  for (let k = 0; k < 5; k++) { y += WHIP_TY[k]; r += WHIP_R[k]; WHIP10.push([TCV - (5 - k) / FPSA, { y, rz: r, vb: WHIP_S[k] }, 'h']); }
+  WHIP10.push([TCV, { y: y + 150, rz: -5.31, vb: 26, o: 0 }, 'h']); } // the slabs cover the cut (as in Slime); its glows go with it
+/* The slit band shows the timeline lane at Slime's framing (lane point 940,786 at stage centre, ×1.9);
+   its edges are fixed in the panel's own pixels, so the push carries them like Slime's band. */
+const BAND = (open) => { const cy = 786 + (460 - 500) / 1.9, hh = 160 * open / 1.9; return [cy - hh, 0, 900 - (cy + hh), 0]; };
+const PZ = [];
+{ let z = 1, pdy = 0; for (let i = 0; i < PUSH.length; i++) { z *= PUSH[i]; if (PSTEP[i]) pdy -= PSTEP[i] === 2 ? 20 : 6; PZ.push([z, pdy]); } }
+const K11 = [[TCV, { u: 940, v: 786, x: 800, y: 500, z: 0, s: 1.9, rx: 0, ry: 0, o: 0, l: 1, b: 0, c: BAND(0.08) }, 'h']];
+[0.08, 0.55, 0.85, 1].forEach((op, i) => K11.push([fr(4 + i), { o: 1, c: BAND(op) }, 'h']));
+PZ.forEach(([z, pdy], i) => K11.push([fr(8 + i), { s: 1.9 * z, y: 500 + pdy }, 'h']));
+{ const [z, pdy] = PZ[PZ.length - 1];
+  K11.push([EXPT, { c: BAND(1), s: 1.9 * z, y: 500 + pdy, u: 940, v: 786, x: 800 }, 'h']);
+  K11.push([EXPT + EXPD, { c: [0, 0, 0, 0], s: 0.95, u: 720, v: 450, x: 800, y: 490 }, 'o']); }
+
+/* S6 — Echo opens up (09): the group grows out of its menu item; signals and audio run inside. */
+const s09 = seg('s09', [
+  [T('inside', 0.3), { u: 720, v: 450, x: 640, y: 470, s: 0.06, o: 0 }],
+  [T('inside', 0.7), { o: 1 }],
+  [T('inside', 4.5), { x: 800, y: 490, s: 1.2, u: 820, v: 430 }, 'o5'],
+  [T('path', 1.5), { o: 1 }],
+  [T('path', 1.7), { o: 0 }]
+]);
+burstAt({ seg: s08, u: 951, v: 429 }, T('inside', 0.3), [COL.pink, COL.signal, COL.audio, '#ffffff'], 1.0);
+const W09G = [[[840, 478], [860, 516]], [[1015, 478], [1035, 516]], [[1191, 478], [1231, 433]]];
+const W09Y = [[[664, 207], [684, 562]], [[469, 446], [508, 483]], [[840, 694], [860, 562]], [[1015, 694], [1035, 567]]];
+// (D's particle flow on 09 is replaced by Slime's build: nodes enter, wires draw, pulses — see insideSync)
+box({ seg: s09, rect: [509, 141, 664, 162], col: COL.signal, t0: T('inside', 1.6), t1: T('path', 0.4) });
+box({ seg: s09, rect: [684, 437, 840, 456], col: COL.audio, t0: T('inside', 2.0), t1: T('path', 0.4), ph: 0.3 });
+box({ seg: s09, rect: [860, 437, 1015, 456], col: COL.number, t0: T('inside', 2.4), t1: T('path', 0.4), ph: 0.6 });
+box({ seg: s09, rect: [1035, 437, 1191, 456], col: COL.audio, t0: T('inside', 2.8), t1: T('path', 0.4), ph: 0.9 });
+
+/* S7 — Menu Path (10): the pencil opens "Edit Node Type"; the panel wipes in from the right. */
+const s10 = seg('s10', [
+  [T('path', 0.45), { u: 820, v: 430, x: 800, y: 490, s: 1.2, o: 1, c: [0, 0, 0, 1440] }],
+  [T('path', 1.3), { c: [0, 0, 0, 1121] }, 'o'],
+  [T('path', 1.36), { c: [0, 0, 0, 0] }, 'l'],
+  [T('path', 1.5), { s: 1.2, u: 820, v: 430 }],
+  [T('path', 4.5), { s: 2.0, u: 1040, v: 392 }],
+  ...WHIP10
+]);
+stream({ t0: T('path', 0), dur: 0.45, from: { seg: s09, u: 1191, v: 478 }, to: { seg: s09, u: 495, v: 102 }, colors: [COL.wave, COL.violet, '#ffffff'], n: 44, lift: -150, width: 6, sparkScale: 0.5 });
+fx(T('path', 0.45), T('path', 1.34), (t) => { // glowing leading edge of the editor panel
+  const p = s10.cur, u = p.c[3];
+  if (u >= 1439) return;
+  const a = proj(p, u, 0), b = proj(p, u, 900);
+  line(a, b, COL.wave, 12, 0.22); line(a, b, '#ffffff', 2, 0.8);
+});
+// the wires left of the editor keep flowing (the Cross Fade → Group Output wire is now under the panel)
+flow({ seg: s10, t0: T('path', 1.3), t1: T('curves', 1.0), gap: 5, speed: 90, fi: 0.5, a: 0.8,
+  paths: [...W09G.slice(0, 2).map((w) => Object.assign(wire(w[0], w[1]), { col: COL.audio })), ...W09Y.map((w) => Object.assign(wire(w[0], w[1]), { col: COL.signal }))] });
+box({ seg: s10, rect: [1134, 326, 1250, 356], col: COL.pink, t0: T('path', 2.1), t1: T('curves', 0.5) });
+box({ seg: s10, rect: [1133, 407, 1391, 433], col: COL.silver, t0: T('path', 2.7), t1: T('curves', 0.5), ph: 0.5 });
+trace({ seg: s10, pts: [[1141, 437], [1382, 437]], t0: T('path', 2.9), dur: 1.1, col: COL.pink });
+
+/* S8 — the timeline (11), playing: the lime "pad cutoff" curve carries light across the bars. */
+const s11 = seg('s11', [
+  ...K11,
+  [T('curves', 5.0), { s: 1.38, u: 980, v: 690, ry: 0 }],
+  [T('grid', 1.0), { o: 1 }],
+  [T('grid', 1.25), { o: 0 }]
+]);
+const CURVE = [[502, 860], [576, 855], [661, 844], [720, 832], [789, 814], [864, 788], [936, 765], [1008, 747], [1080, 733], [1152, 726], [1220, 724], [1282, 734], [1339, 755], [1429, 778]];
+// (D's editor → timeline light stream is replaced by Slime's whip → slabs → slit)
+edgeFlash({ seg: s11, t0: EXPT + EXPD, col: COL.lime });
+flow({ seg: s11, t0: EXPT + EXPD, t1: T('grid', 1.25), gap: 6, speed: 120, size: 2.3, fo: 0.25,
+  paths: [{ pts: CURVE, col: COL.lime },
+    Object.assign(wire([421, 214], [536, 356]), { col: COL.signal }), Object.assign(wire([421, 300], [538, 356]), { col: COL.signal }),
+    Object.assign(wire([577, 425], [623, 456]), { col: COL.audio })] });
+box({ seg: s11, rect: [788, 690, 790, 900], col: COL.amber, pad: 1, t0: T('curves', 1.8), t1: T('grid', 0.6) });
+ring({ seg: s11, u: 789, v: 814, r: 8, col: COL.lime, t0: T('curves', 1.9), t1: T('grid', 0.6) });
+box({ seg: s11, rect: [677, 594, 857, 612], col: COL.silver, t0: T('curves', 2.5), t1: T('grid', 0.5), ph: 0.4 });
+
+/* S9 — the grid finder (12): opened from "find grid"; the top suggestion and its on-grid hits glow. */
+const s12 = seg('s12', [
+  [T('grid', 0.5), { u: 980, v: 690, x: 800, y: 490, s: 1.38, o: 0 }],
+  [T('grid', 0.95), { o: 1 }],
+  [T('grid', 1.1), { s: 1.38, u: 980, v: 690 }],
+  [T('grid', 4.5), { s: 1.75, u: 640, v: 385 }],
+  [T('library', 0), { z: 0, x: 800, y: 490, ry: 0, o: 1, b: 0, l: 1 }],
+  [T('library', 1.1), { z: -1000, x: 380, y: 330, ry: 24, o: 0, b: 4, l: 0.35 }, 'i']
+]);
+stream({ t0: T('grid', 0), dur: 0.5, from: { seg: s11, u: 1220, v: 724 }, to: { seg: s11, u: 1158, v: 646 }, colors: [COL.lime, '#ffffff'], n: 30, lift: 60, width: 5, sparkScale: 0.5 });
+box({ seg: s12, rect: [281, 301, 504, 366], col: COL.amber, t0: T('grid', 1.4), t1: T('library', 0.5) });
+[741, 813, 886, 935, 1008, 1080, 1129, 1202, 1275, 1323, 1397, 1470, 1517].forEach((x, i) =>
+  burstAt({ seg: s12, u: x * 0.72, v: 367 }, T('grid', 2.0 + i * 0.11), [COL.audio, '#ffffff'], 0.22));
+
+/* S10 — the library (13's sidebar + tabs). S11 — the same shot pans to the Bowed String column. */
+const s13 = seg('s13', [
+  [T('library', 0), { u: 380, v: 230, x: 1250, y: 520, z: -1100, s: 2.0, ry: -24, rx: 4, o: 0, l: 0.15 }],
+  [T('library', 0.35), { o: 1 }],
+  [T('library', 1.05), { l: 0.15 }],
+  [T('library', 1.3), { x: 800, y: 500, z: 0, ry: 0, rx: 0, s: 2.0, u: 380, v: 230 }, 'o'],
+  [T('library', 1.6), { l: 1 }, 'o'],
+  [T('library', 3.8), { s: 2.1, u: 370, v: 228 }],
+  [T('physical', 0), { c: [0, 0, 0, 0], x: 800, y: 500, ry: 0 }],
+  [T('physical', 1.5), { u: 697, v: 340, s: 1.6, x: 1180, y: 430, ry: -16, c: [170, 630, 390, 585] }],
+  [T('physical', 5.2), { ry: -9, y: 420 }],
+  [T('blip', 0), { o: 1, z: 0 }],
+  [T('blip', 0.8), { o: 0, z: -600 }]
+]);
+stream({ t0: T('library', 0.05), dur: 1.05, from: { seg: s12, u: 392, v: 334 }, to: { seg: s13, u: 213, v: 94 }, colors: [COL.number, COL.number, '#ffffff'], n: 80, lift: -160, width: 12, sparkScale: 0.8 });
+edgeFlash({ seg: s13, t0: T('library', 1.1), col: COL.number });
+box({ seg: s13, rect: [6, 85, 88, 102], col: COL.number, t0: T('library', 1.4), t1: T('physical', 0.4) });
+box({ seg: s13, rect: [198, 52, 248, 71], col: COL.number, t0: T('library', 1.75), t1: T('physical', 0.4), ph: 0.3 });
+box({ seg: s13, rect: [178, 85, 248, 102], col: COL.number, t0: T('library', 2.1), t1: T('physical', 0.4), ph: 0.6 });
+box({ seg: s13, rect: [261, 45, 997, 78], col: COL.silver, t0: T('library', 2.5), t1: T('physical', 0.4), ph: 0.1 });
+
+/* S11 — physically modelled: three floating crops — the struck-string piano, the bowed strings, the demo cards. */
+const s02b = seg('s02', [
+  [T('physical', 0.3), { u: 720, v: 320, x: -150, y: 420, z: -700, ry: 34, s: 0.8, o: 0, c: [40, 400, 300, 400] }],
+  [T('physical', 0.7), { o: 1 }],
+  [T('physical', 1.7), { x: 430, y: 410, z: 0, ry: 14 }, 'o'],
+  [T('physical', 5.2), { ry: 9, y: 400 }],
+  [T('blip', 0), { o: 1, z: 0 }],
+  [T('blip', 0.8), { o: 0, z: -600 }]
+]);
+const s03 = seg('s03', [
+  [T('physical', 0.8), { u: 685, v: 495, x: 800, y: 1200, z: -400, s: 1.05, rx: -24, o: 0, c: [430, 440, 340, 370] }],
+  [T('physical', 1.25), { o: 1 }],
+  [T('physical', 2.1), { y: 770, z: 0, rx: 0 }, 'o'],
+  [T('physical', 5.2), { s: 1.08 }],
+  [T('blip', 0), { c: [430, 440, 340, 370], u: 685, v: 495, x: 800, y: 770, s: 1.08 }],
+  [T('blip', 1.3), { c: [0, 0, 0, 0], u: 720, v: 450, x: 800, y: 490, s: 1.0 }],
+  [T('blip', 1.4), { s: 1.0, u: 720, v: 450 }],
+  [T('blip', 3.0), { s: 1.75, u: 1175, v: 800, o: 1 }],
+  [T('blip', 3.45), { o: 0 }]
+]);
+box({ seg: s13, rect: [585, 170, 810, 510], col: COL.bow, pad: 0, t0: T('physical', 1.4), t1: T('blip', 0.6) });
+box({ seg: s02b, rect: [400, 40, 1040, 600], col: COL.gold, pad: 0, t0: T('physical', 1.6), t1: T('blip', 0.6), ph: 0.5 });
+dust({ seg: s02b, rect: [420, 60, 1020, 420], n: 40, col: COL.gold, t0: T('physical', 1.0), t1: T('blip', 0.7), speed: 6 });
+stream({ t0: T('physical', 2.2), dur: 0.9, from: { seg: s02b, u: 700, v: 400 }, to: { seg: s03, u: 420, v: 470 }, colors: [COL.gold, COL.gold, '#ffffff'], n: 44, lift: 90, width: 6, sparkScale: 0.5 });
+stream({ t0: T('physical', 2.6), dur: 0.9, from: { seg: s13, u: 740, v: 199 }, to: { seg: s03, u: 578, v: 470 }, colors: [COL.bow, COL.bow, '#ffffff'], n: 44, lift: -110, width: 6, sparkScale: 0.5 });
+box({ seg: s03, rect: [377, 437, 521, 553], col: COL.gold, t0: T('physical', 3.1), t1: T('blip', 0.7) });
+box({ seg: s03, rect: [534, 437, 679, 553], col: COL.bow, t0: T('physical', 3.5), t1: T('blip', 0.7), ph: 0.25 });
+box({ seg: s03, rect: [691, 437, 836, 553], col: COL.signal, t0: T('physical', 3.8), t1: T('blip', 0.7), ph: 0.5 });
+box({ seg: s03, rect: [849, 437, 994, 553], col: COL.number, t0: T('physical', 4.1), t1: T('blip', 0.7), ph: 0.75 });
+
+/* S12 — Blip (03 → 05): the Welcome page unfolds, we meet Blip, then Blip spotlights "Demos". */
+const s05 = seg('s05', [
+  [T('blip', 2.95), { u: 1175, v: 800, x: 800, y: 490, s: 1.75, o: 0 }],
+  [T('blip', 3.4), { o: 1 }],
+  [T('blip', 3.5), { s: 1.75, u: 1175, v: 800, y: 490 }],
+  [T('blip', 4.8), { s: 0.96, u: 720, v: 450, y: 450 }],
+  [T('blip', 6.0), { s: 0.98, u: 720, v: 445 }],
+  [T('end', 0), { z: 0, o: 1, b: 0, l: 1 }],
+  [T('end', 1.4), { z: -2200, o: 0, b: 6, l: 0.25 }, 'i']
+]);
+box({ seg: s03, rect: [1085, 731, 1422, 859], col: COL.violet, t0: T('blip', 1.9), t1: T('blip', 3.45) });
+dust({ seg: s03, rect: [900, 740, 1080, 880], n: 28, col: COL.violet, t0: T('blip', 1.5), t1: T('blip', 3.45), speed: 14 });
+dust({ seg: s05, rect: [900, 740, 1080, 880], n: 28, col: COL.violet, t0: T('blip', 3.1), t1: T('end', 0.8), speed: 14 });
+stream({ t0: T('blip', 4.0), dur: 1.0, from: { seg: s05, u: 923, v: 794 }, to: { seg: s05, u: 950, v: 24 }, colors: [COL.violet, COL.pink, '#ffffff'], n: 70, lift: -230, width: 10, sparkScale: 0.8 });
+box({ seg: s05, rect: [890, 4, 1012, 42], col: COL.violet, t0: T('blip', 5.0), t1: T('end', 0.8) });
+
+/* S13 — finale: A's final slide (see #finale and the motes below). */
+
+/* ---------- captions ---------- */
+const capsEl = $('#caps');
+SC.forEach((s) => {
+  if (!s.cap) return;
+  const d = document.createElement('div');
+  d.className = 'cap' + (s.kind === 'stage' ? ' stage' : '');
+  if (s.col) d.style.setProperty('--acc', COL[s.col]);
+  const glyph = s.kind === 'stage' ? '' : `<i class="g ${s.gl}"></i>`;
+  d.innerHTML = `<div class="eb">${glyph}<span></span></div><div class="ln"></div>`;
+  d.querySelector('.eb span').textContent = s.eb;
+  d.querySelector('.ln').textContent = s.cap;
+  capsEl.appendChild(d); s.el = d; s.cache = '';
+});
+function setCap(s, a) {
+  if (!s.el) return;
+  const key = a.toFixed(3);
+  if (key === s.cache) return;
+  s.cache = key;
+  s.el.style.opacity = key;
+  s.el.style.transform = `translateY(${((1 - a) * 14).toFixed(1)}px)`;
+  s.el.style.filter = a > 0.99 ? 'none' : `blur(${((1 - a) * 6).toFixed(2)}px)`;
+}
+
+/* ---------- logo ---------- */
+const logoEl = $('#logo'), wordEl = $('#word'), tagEl = $('#tag'), condEl = $('#cond');
+const wires = [...document.querySelectorAll('#mark .lw')], nodes = [...document.querySelectorAll('#mark .ln')];
+const WL = wires.map((w) => { const L = w.getTotalLength ? w.getTotalLength() : 40; w.style.strokeDasharray = L; return L; });
+const RC = 2 * Math.PI * 6; condEl.style.strokeDasharray = RC;
+const letters = 'Nodestra'.split('').map((ch) => { const s = document.createElement('span'); s.textContent = ch; wordEl.appendChild(s); return s; });
+function renderLogo(L, alpha) {
+  logoEl.style.display = alpha > 0.002 ? 'block' : 'none';
+  if (alpha <= 0.002) return;
+  logoEl.style.opacity = alpha.toFixed(3);
+  const kr = EZ.o(clamp((L - 0.85) / 0.45));
+  condEl.style.strokeDashoffset = (RC * (1 - kr)).toFixed(2);
+  condEl.style.opacity = kr > 0 ? 1 : 0;
+  wires.forEach((w, i) => { const k = EZ.io(clamp((L - (1.05 + i * 0.12)) / 0.6)); w.style.strokeDashoffset = (WL[i] * (1 - k)).toFixed(2); w.style.opacity = k > 0 ? 1 : 0; });
+  nodes.forEach((n, i) => {
+    const k = clamp((L - (1.55 + i * 0.12)) / 0.45), sc = k <= 0 ? 0 : EZ.back(k);
+    const cx = +n.getAttribute('cx'), cy = +n.getAttribute('cy');
+    n.setAttribute('transform', `translate(${cx} ${cy}) scale(${sc.toFixed(3)}) translate(${-cx} ${-cy})`);
+  });
+  letters.forEach((s, j) => {
+    const k = EZ.o(clamp((L - (2.25 + j * 0.06)) / 0.7));
+    s.style.opacity = k.toFixed(3);
+    s.style.transform = `translateY(${((1 - k) * 26).toFixed(1)}px)`;
+    s.style.filter = k > 0.99 ? 'none' : `blur(${((1 - k) * 8).toFixed(1)}px)`;
+  });
+  const kt = EZ.o(clamp((L - 3.0) / 0.8));
+  tagEl.style.opacity = kt.toFixed(3);
+  tagEl.style.transform = `translateY(${((1 - kt) * 12).toFixed(1)}px)`;
+}
+
+/* ---------- ambient void: dot-grid parallax + slow motes ---------- */
+const dots1 = $('#dots1'), dots2 = $('#dots2'), neb = $('#neb');
+const MOTE_COLS = ['#ffffff', '#ffffff', '#ffffff', COL.audio, COL.signal, COL.number, COL.gate, COL.wave];
+function ambient(t) {
+  const tt = reduced ? 0 : t;
+  const sway = Math.sin(tt * 0.21) * 10;
+  dots1.style.transform = `translate3d(${(-((tt * 7) % 24) + sway * 0.4).toFixed(2)}px,${(-((tt * 3) % 24)).toFixed(2)}px,0)`;
+  dots2.style.transform = `translate3d(${(-((tt * 16) % 72) + sway).toFixed(2)}px,${(-((tt * 6) % 72)).toFixed(2)}px,0)`;
+  neb.style.transform = `translate3d(${(Math.sin(tt * 0.07) * 40).toFixed(1)}px,${(Math.cos(tt * 0.05) * 30).toFixed(1)}px,0)`;
+  if (reduced) return;
+  for (let i = 0; i < 9; i++) { // soft out-of-focus bokeh
+    const r1 = rnd(9000 + i), r2 = rnd(9100 + i), r3 = rnd(9200 + i);
+    const x = frac(r1 + tt * 0.006 * (0.5 + r3)) * (W + 200) - 100, y = r2 * H + Math.sin(tt * 0.2 + i) * 30;
+    dot(x, y, 50 + r3 * 60, MOTE_COLS[3 + (i % 5)], 0.07, true);
+  }
+  for (let i = 0; i < 110; i++) {
+    const r1 = rnd(7000 + i), r2 = rnd(7200 + i), r3 = rnd(7400 + i), r4 = rnd(7600 + i);
+    const x = r1 * W + Math.sin(tt * 0.15 * (0.5 + r3) + r4 * 6) * 30;
+    const y = frac(r2 - tt * 0.005 * (0.4 + r3)) * H;
+    const tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(tt * (0.6 + r3 * 1.4) + r4 * 6.28));
+    dot(x, y, 2.2 + r3 * 3.2, MOTE_COLS[i % MOTE_COLS.length], (0.05 + r4 * 0.16) * tw);
+  }
+}
+
+/* ---------- C's spotlight, A's dust, the intro, A's final slide ---------- */
+const beamEl = $('#beam'), introEl = $('#intro'), finaleEl = $('#finale');
+const mv = $('#motes'), mctx = mv.getContext('2d');
+'NODESTRA'.split('').forEach((ch) => { const sp = document.createElement('span'); sp.textContent = ch; introEl.appendChild(sp); });
+const introLetters = [...introEl.children];
+/* How bright the beam is: full in the intro, gone as the stage panel lights, back for the ending. */
+function beamOpacity(id, l, sc) {
+  if (id === 'intro') return clamp(l / 0.8);
+  if (id === 'stage') return 1 - clamp((l - 0.4) / 1.2);
+  if (id === 'end') return clamp((l - 0.2) / 1.6) * (1 - clamp((l - (sc.d - 0.9)) / 0.9));
+  return 0;
+}
+/* A's dust: warm motes drifting up, a little Brownian; C's beam lights the ones inside it. */
+const MN = reduced ? 0 : 640;
+const mx = new Float32Array(MN), my = new Float32Array(MN), mz = new Float32Array(MN), mph = new Float32Array(MN);
+for (let q = 0; q < MN; q++) { mx[q] = Math.random() * W; my[q] = Math.random() * H; mz[q] = Math.random(); mph[q] = Math.random() * 100; }
+/* The first play opens like every loop: run the finale's motion once (same drift + gather as motes(),
+   nothing drawn), so the motes start out gathered into the end ball and disperse in the intro. */
+{ const E = SC[SC.length - 1], step = 1 / 60;
+  for (let l = 0; l < E.d; l += step) {
+    const g = clamp(l / 2.5) * (1 - clamp((l - (E.d - 0.9)) / 0.9)), t = E.start + l;
+    for (let q = 0; q < MN; q++) {
+      const z = mz[q];
+      mx[q] += (Math.sin(t * (0.23 + z * 0.3) + mph[q]) * 9 + Math.sin(t * 0.9 + mph[q] * 3) * 3) * step;
+      my[q] += (-6 - z * 10 + Math.cos(t * (0.2 + z * 0.2) + mph[q]) * 6) * step;
+      if (g > 0) {
+        const tx = 800 + Math.cos(mph[q]) * 100 * (1 - z), ty = 330 + Math.sin(mph[q] * 1.7) * 78 * (1 - z);
+        mx[q] += (tx - mx[q]) * g * step * 1.4; my[q] += (ty - my[q]) * g * step * 1.4;
+      }
+      if (my[q] < -10) { my[q] = H + 10; mx[q] = Math.random() * W; }
+      if (mx[q] < -10) mx[q] = W + 10; else if (mx[q] > W + 10) mx[q] = -10;
+    }
+  } }
+const inBeam = (x, y) => { const q = (x - 800) / (94 + y * 0.47); return Math.exp(-q * q); };
+let gather = 0; // A's final slide: 0..1, the motes are drawn to a halo round the mark
+let lastMote = 0;
+function motes(t, bO) {
+  const dt = clamp(t - lastMote, 0, 0.05); lastMote = t;
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.clearRect(0, 0, mv.width, mv.height);
+  if (!MN || bO <= 0.003) return;
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  mctx.globalCompositeOperation = 'lighter';
+  for (let q = 0; q < MN; q++) {
+    const z = mz[q];
+    mx[q] += (Math.sin(t * (0.23 + z * 0.3) + mph[q]) * 9 + Math.sin(t * 0.9 + mph[q] * 3) * 3) * dt;
+    my[q] += (-6 - z * 10 + Math.cos(t * (0.2 + z * 0.2) + mph[q]) * 6) * dt;
+    if (gather > 0) {
+      const tx = 800 + Math.cos(mph[q]) * 100 * (1 - z), ty = 330 + Math.sin(mph[q] * 1.7) * 78 * (1 - z);
+      mx[q] += (tx - mx[q]) * gather * dt * 1.4; my[q] += (ty - my[q]) * gather * dt * 1.4;
+    }
+    if (my[q] < -10) { my[q] = H + 10; mx[q] = Math.random() * W; }
+    if (mx[q] < -10) mx[q] = W + 10; else if (mx[q] > W + 10) mx[q] = -10;
+    const lit = 0.06 + 1.3 * inBeam(mx[q], my[q]);
+    const a = (0.07 + 0.34 * z) * Math.min(1, lit + gather * 0.8) * (0.6 + 0.4 * Math.sin(t * (1 + z) + mph[q])) * bO;
+    mctx.fillStyle = `rgba(255,228,180,${a.toFixed(3)})`;
+    mctx.beginPath(); mctx.arc(mx[q], my[q], 0.7 + z * 2.1, 0, Math.PI * 2); mctx.fill();
+  }
+  mctx.globalCompositeOperation = 'source-over';
+}
+let finaleOn = false;
+function stageLights(sc, l) {
+  const bO = beamOpacity(sc.id, l, sc);
+  beamEl.style.opacity = bO.toFixed(3);
+  // The intro: the name, letter by letter, in the stage's gold serif.
+  const iv = sc.id === 'intro' ? Math.min(1, clamp((sc.d - l) / 0.6)) : 0;
+  introEl.style.opacity = iv.toFixed(3);
+  introLetters.forEach((sp, k) => sp.classList.toggle('on', sc.id === 'intro' && l > 0.5 + k * 0.2));
+  // A's final slide.
+  const on = sc.id === 'end' && l > 0.3;
+  if (on !== finaleOn) { finaleEl.classList.toggle('on', on); finaleOn = on; }
+  finaleEl.style.opacity = (sc.id === 'end' ? clamp(l / 0.5) * (1 - clamp((l - (sc.d - 0.9)) / 0.9)) : 0).toFixed(3);
+  gather = sc.id === 'end' ? clamp(l / 2.5) * (1 - clamp((l - (sc.d - 0.9)) / 0.9)) : 0;
+  motes(sc.start + l, reduced ? 0 : bO);
+}
+
+
+/* ---------- Slime effects ported in (pure functions of t) ---------- */
+const EOa = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const HK9 = { ready: false };
+function hookInside() {
+  const f = s09.el.querySelector('iframe'), d = f && f.contentDocument;
+  if (!d || !d.querySelector('.react-flow__node')) return false;
+  const pos = (n) => { const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(n.style.transform || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
+  HK9.nodes = [...d.querySelectorAll('.react-flow__node')].sort((a, b) => pos(a)[0] - pos(b)[0] || pos(a)[1] - pos(b)[1]);
+  HK9.edges = [];
+  d.querySelectorAll('.react-flow__edge').forEach((g) => {
+    const p = g.querySelector('path.react-flow__edge-path'); if (!p) return;
+    let L = 0; try { L = p.getTotalLength(); } catch (e) { L = 0; }
+    if (L < 5) return;
+    const stop = g.querySelector('stop'), col = (stop && stop.getAttribute('stop-color')) || '#2ECC71';
+    const c = d.createElementNS('http://www.w3.org/2000/svg', 'circle'); c.setAttribute('r', '5.5'); c.setAttribute('fill', '#ffffff');
+    c.style.filter = `drop-shadow(0 0 4px ${col}) drop-shadow(0 0 11px ${col})`; c.style.opacity = '0'; c.style.pointerEvents = 'none';
+    g.appendChild(c);
+    HK9.edges.push({ p, L, c, x0: p.getPointAtLength(0).x });
+  });
+  HK9.edges.sort((a, b) => a.x0 - b.x0);
+  HK9.ready = true; return true;
+}
+const sv = (el, k, v) => { if (el['__' + k] !== v) { el['__' + k] = v; el.style[k] = v; } };
+function insideSync(t) {
+  if (!HK9.ready && !hookInside()) return;
+  const TL = T('inside', 1.35);
+  const active = !reduced && t >= T('inside', 0) && t < T('path', 1.8);
+  const lf = active ? Math.floor((t - TL) * FPSA) : 1e9; // frames since Echo landed (on ones)
+  HK9.nodes.forEach((n, i) => {
+    const k = EOa((lf - i * 2) / 4);
+    sv(n, 'opacity', k.toFixed(3)); sv(n, 'filter', k >= 1 ? 'none' : `blur(${((1 - k) * 7).toFixed(1)}px)`); sv(n, 'translate', `0px ${((1 - k) * 22).toFixed(1)}px`);
+  });
+  const on = active && lf >= 30;
+  HK9.edges.forEach((e, i) => {
+    const k = EOa((lf - 12 - i) / 8);
+    sv(e.p, 'strokeDasharray', e.L.toFixed(1)); sv(e.p, 'strokeDashoffset', (e.L * (1 - k)).toFixed(1));
+    if (!on) { sv(e.c, 'opacity', '0'); return; }
+    const u = frac(((lf - 30) / FPSA) * 240 / Math.max(e.L, 120) * 0.5 + i * 0.137), pt = e.p.getPointAtLength(u * e.L);
+    e.c.setAttribute('cx', pt.x.toFixed(1)); e.c.setAttribute('cy', pt.y.toFixed(1)); sv(e.c, 'opacity', Math.sin(Math.PI * u).toFixed(3));
+  });
+}
+const TV = {}; ['gSlabs', 'gBars', 'gSur', 'gSurT', 'surSlab', 'surA', 'surB', 'bandTop', 'bandBot', 'gSlit', 'slA', 'slB', 'sl1', 'sl2', 'sl3', 'sl4'].forEach((id) => { TV[id] = document.getElementById(id); });
+const showV = (el, on) => { const v = on ? 'inline' : 'none'; if (el.__d !== v) { el.__d = v; el.setAttribute('display', v); } };
+function transSync(t) {
+  const live = !reduced && t >= TCV && t < EXPT + EXPD;
+  const lf = live ? Math.floor((t - TCV) * FPSA) : -1;
+  showV(TV.gSlabs, live && lf <= 2);
+  if (live && lf <= 2) { const d = (lf + 1) * 180; TV.sl1.setAttribute('x', -760 + d); TV.sl2.setAttribute('x', -1000 + d * 1.3); TV.sl3.setAttribute('x', 560 - d * 1.1); TV.sl4.setAttribute('x', 760 - d * 1.4); }
+  showV(TV.gBars, live && lf === 3);
+  const sur = live && lf >= 4;
+  showV(TV.gSur, sur);
+  if (sur) {
+    // band edges straight from the timeline panel's own clip, so surround and band always meet
+    const p = s11.cur, top = proj(p, 720, p.c[0])[1], bot = proj(p, 720, 900 - p.c[2])[1];
+    const [z, pdy] = lf >= 8 ? PZ[Math.min(lf - 8, PZ.length - 1)] : [1, 0];
+    TV.surA.setAttribute('height', Math.max(0, top).toFixed(1)); TV.surB.setAttribute('y', bot.toFixed(1)); TV.surB.setAttribute('height', Math.max(0, 1000 - bot).toFixed(1));
+    TV.surSlab.setAttribute('opacity', clamp(1 - (lf - 4) / 10).toFixed(3));
+    TV.gSurT.setAttribute('transform', `translate(800 ${(500 + pdy).toFixed(1)}) scale(${z.toFixed(4)}) translate(-800 -500)`);
+    TV.bandTop.setAttribute('y', (top - 6).toFixed(1)); TV.bandBot.setAttribute('y', (bot - 1).toFixed(1));
+    showV(TV.gSlit, lf < 8);
+    if (lf < 8) { const y = (bot + 10).toFixed(1); TV.slA.setAttribute('x1', 0); TV.slA.setAttribute('y1', y); TV.slA.setAttribute('x2', 480); TV.slA.setAttribute('y2', 1020); TV.slB.setAttribute('x1', 1600); TV.slB.setAttribute('y1', y); TV.slB.setAttribute('x2', 1120); TV.slB.setAttribute('y2', 1020); }
+  } else showV(TV.gSlit, false);
+}
+
+/* ---------- frame ---------- */
+const barEl = $('#bar i'), scrimB = $('#scrimB'), scrimT = $('#scrimT'), hud = $('#hud');
+SC.forEach((s, i) => { if (!i) return; const b = document.createElement('b'); b.style.left = (s.start / TOTAL * 100).toFixed(3) + '%'; $('#bar').appendChild(b); });
+let dpr = 1;
+function render(t) {
+  liveSync(t);
+  const i = sceneAt(t), sc = SC[i], l = t - sc.start;
+  const j = (i + 1) % SC.length, nx = SC[j];
+  // panels
+  if (!reduced) {
+    for (const sg of SEGS) { const p = poseAt(sg, t); sg.cur = p; applySeg(sg, p, p.o); }
+  } else {
+    const w = clamp((l - (sc.d - 0.9)) / 0.9);
+    const ta = sc.start + sc.rest, tb = nx.start + nx.rest;
+    for (const sg of SEGS) {
+      const pa = poseAt(sg, ta), pb = poseAt(sg, tb);
+      const oa = pa.in ? pa.o : 0, ob = pb.in ? pb.o : 0, o = oa * (1 - w) + ob * w;
+      const use = ob * w > oa * (1 - w) ? pb : pa;
+      use.in = o > 0.003; use.b = 0; sg.cur = use; applySeg(sg, use, o);
+    }
+  }
+  // captions + scrims
+  let aB = 0, aT = 0;
+  SC.forEach((s, k) => {
+    let a = 0;
+    if (reduced) {
+      const w = clamp((l - (sc.d - 0.9)) / 0.9);
+      if (k === i) a = 1 - w; else if (k === j) a = w;
+    } else if (k === i && s.cap) {
+      a = Math.min(clamp((l - s.ci) / 0.6), clamp((s.d - 0.08 - l) / 0.5));
+    }
+    if (s.cap) { setCap(s, a); if (s.kind === 'stage') aT = Math.max(aT, a); else aB = Math.max(aB, a); }
+  });
+  scrimB.style.opacity = aB.toFixed(3);
+  scrimT.style.opacity = aT.toFixed(3);
+  // B's own logo is replaced by A's final slide.
+  renderLogo(0, 0);
+  stageLights(sc, l);
+  insideSync(t);
+  transSync(t);
+  // particles
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalCompositeOperation = 'lighter';
+  budget = 0;
+  ambient(t);
+  if (!reduced) for (const f of FX) if (t >= f.t0 && t <= f.t1) f.fn(t);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  barEl.style.transform = `scaleX(${(t / TOTAL).toFixed(5)})`;
+}
+
+/* ---------- fit, clock, controls ---------- */
+function fit() {
+  const k = Math.min(innerWidth / W, innerHeight / H);
+  stage.style.transform = `translate(-50%,-50%) scale(${k})`;
+  dpr = Math.min(2, (devicePixelRatio || 1) * k);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  mv.width = cv.width; mv.height = cv.height;
+  dirty = true;
+}
+let t = 0, last = null, playing = true, raf = 0, dirty = true, started = false;
+function frame(ts) {
+  raf = requestAnimationFrame(frame);
+  if (last === null) last = ts;
+  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+  if (playing) { t += dt; if (t >= TOTAL) t -= TOTAL; dirty = true; }
+  if (dirty) { render(t); dirty = false; }
+}
+function run() { if (!raf && started && !document.hidden) { last = null; raf = requestAnimationFrame(frame); } }
+function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+function setPlaying(v) { playing = v; hud.classList.toggle('on', !v); dirty = true; dispatchEvent(new CustomEvent('tourplaying', { detail: playing })); }
+function seek(to) { t = ((to % TOTAL) + TOTAL) % TOTAL; dirty = true; if (!raf) render(t); }
+window.__adSeek = (x) => { halt(); seek(x); render(t); }; window.__adTotal = TOTAL; window.__adNow = () => t;
+function skip(dir) {
+  const i = sceneAt(t);
+  if (dir > 0) seek(SC[(i + 1) % SC.length].start + 0.001);
+  else seek(t - SC[i].start > 1.0 ? SC[i].start + 0.001 : SC[(i - 1 + SC.length) % SC.length].start + 0.001);
+}
+stage.addEventListener('click', () => setPlaying(!playing));
+if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');
+window.__tour = {
+  skipBy(sec) { seek(t + sec); },
+  toggle() { setPlaying(!playing); return playing; },
+  isPlaying: () => playing,
+};
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); skip(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); skip(-1); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) halt(); else run(); });
+addEventListener('resize', fit);
+fit();
+
+/* ---------- preload, then start ---------- */
+const lbar = $('#loader .lbar i'), keep = [];
+const srcs = []; // no images at all in this variant
+let done = 0;
+const tick = () => { done++; lbar.style.width = (done / srcs.length * 100).toFixed(1) + '%'; };
+const loads = srcs.map((src) => new Promise((res) => {
+  const im = new Image(); keep.push(im);
+  im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { tick(); res(); }); };
+  im.onerror = () => { tick(); res(); };
+  im.src = src;
+}));
+function start() {
+  if (started) return;
+  started = true;
+  $('#loader').classList.add('gone');
+  stage.classList.add('ready');
+  render(0);
+  run();
+}
+Promise.all(loads.concat(uiLoads)).then(() => setTimeout(start, 250));
+setTimeout(start, 20000); // never hang on a missing image
+})();
+</script>
+</body>
+</html>

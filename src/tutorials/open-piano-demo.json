@@ -1,0 +1,97 @@
+{
+  "format": 1,
+  "id": "open-piano-demo",
+  "revision": 1,
+  "title": "Open the piano demo",
+  "summary": "Find the piano in the Demos menu and play it with your keyboard.",
+  "estimatedMinutes": 1,
+  "requires": ["demosMenu"],
+  "steps": [
+    {
+      "id": "hi",
+      "type": "say",
+      "lines": [
+        { "say": "Hi, I'm **Blip**! Let's open the piano — it's three clicks away.", "mood": "happy" }
+      ]
+    },
+    {
+      "id": "demos",
+      "type": "point",
+      "target": { "name": "toolbar.demos" },
+      "skipIf": { "pred": "demosMenu.isOpen" },
+      "lines": [{ "say": "Click **Demos** at the top.", "mood": "pointing" }],
+      "advance": [{ "on": { "event": "demosMenu.opened" }, "goto": "next" }],
+      "timeoutMs": 12000,
+      "hint": [{ "say": "It's the purple button in the toolbar." }],
+      "assist": { "name": "demosMenu.open", "label": "Show me" },
+      "placement": "bottom"
+    },
+    {
+      "id": "category",
+      "type": "point",
+      "target": { "name": "demosMenu.category", "args": { "label": "Playable instruments" } },
+      "allow": [
+        { "name": "demosMenu.list" },
+        { "name": "demosMenu.submenu", "args": { "demoId": "piano" } }
+      ],
+      "skipIf": { "pred": "demosMenu.itemVisible", "args": { "demoId": "piano" } },
+      "lines": [{ "say": "Point at **Playable instruments**.", "mood": "pointing" }],
+      "advance": [
+        { "when": { "pred": "demosMenu.itemVisible", "args": { "demoId": "piano" } }, "goto": "next" },
+        { "on": { "event": "demosMenu.closed" }, "goto": "demos" }
+      ],
+      "timeoutMs": 12000,
+      "hint": [{ "say": "Hover over it — a second list slides out." }]
+    },
+    {
+      "id": "piano",
+      "type": "point",
+      "target": { "name": "demosMenu.item", "args": { "demoId": "piano" } },
+      "allow": [
+        { "name": "demosMenu.list" },
+        { "name": "demosMenu.submenu", "args": { "demoId": "piano" } }
+      ],
+      "lines": [{ "say": "Now click **Piano**.", "mood": "excited" }],
+      "advance": [
+        { "on": { "event": "demo.picked", "args": { "demoId": "piano" } }, "goto": "next" },
+        { "on": { "event": "demosMenu.closed" }, "goto": "demos" }
+      ],
+      "checkpoint": true
+    },
+    {
+      "id": "ready",
+      "type": "branch",
+      "if": { "pred": "graph.hasRun" },
+      "then": "play",
+      "else": "run"
+    },
+    {
+      "id": "run",
+      "type": "point",
+      "target": { "name": "toolbar.autoRun" },
+      "lines": [{ "say": "The piano is loaded. Switch on **Auto-run** so it's ready to play.", "mood": "pointing" }],
+      "advance": [{ "when": { "pred": "graph.hasRun" }, "goto": "play" }],
+      "timeoutMs": 15000,
+      "hint": [{ "say": "Click the **Auto-run** button — it builds the piano in a second." }]
+    },
+    {
+      "id": "play",
+      "type": "point",
+      "target": { "name": "toolbar.octave" },
+      "lines": [
+        { "say": "Play it! Press [[A]] [[S]] [[D]] [[F]] on your keyboard.", "mood": "excited" },
+        { "say": "[[,]] and [[.]] move you down and up an octave." }
+      ],
+      "advance": [{ "on": { "event": "note.played", "count": 4 }, "goto": "next" }],
+      "timeoutMs": 20000,
+      "hint": [{ "say": "Click on the canvas first if your keys do nothing." }]
+    },
+    {
+      "id": "done",
+      "type": "end",
+      "lines": [
+        { "say": "You're playing a physically modelled piano! Replay me any time from **Welcome → Learn**.", "mood": "celebrate" }
+      ]
+    }
+  ]
+}

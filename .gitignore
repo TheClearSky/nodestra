@@ -1,0 +1,57 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+tsconfig.tsbuildinfo
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Tooling / working artifacts (not shipped)
+test-results/
+playwright-report/
+.playwright-mcp/
+.claude/
+review/
+verification/
+
+# Development context — research notes and working documents. Useful
+# while building, not part of the product.
+RESEARCH.md
+research/
+
+# Local-only sync tools: they copy the landing tour and the meadow scenes in
+# from the authoring sources under .claude/ (not in the repo), so they cannot
+# run from a clone. Their OUTPUT (public/landing/, src/landing/meadow/) is the
+# product and is committed.
+scripts/sync-landing-ad.mjs
+scripts/sync-meadow.mjs
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Local authoring/analysis tooling — not part of the shipped app. The
+# generated modules under src/soundDefinitions/instruments/ are the
+# product; nothing in the app imports either directory.
+samples/
+tools/
+
+# Recordings the app itself produces
+*.webm

@@ -1,0 +1,99 @@
+/* Tailwind entry for the sound app.
+ *
+ * Mirrors the host library's setup (`react-blender-nodes/src/index.css`):
+ * Tailwind v4 through `@tailwindcss/vite`, no config file, tokens declared in
+ * `@theme`. `source('.')` scopes class scanning to `src/` so nothing outside
+ * the app source (plans, review notes, sample reports) can leak scraped class
+ * names into the stylesheet.
+ *
+ * Imported LAST in `App.tsx`, after the host's and the plugin's stylesheets, so
+ * that where two compiled Tailwind sheets define the same utility this one wins
+ * the tie.
+ */
+@import 'tailwindcss' source('.');
+
+/* The palette is the HOST's, re-declared because Tailwind v4 generates a
+ * utility only for a token it knows, and a token cannot be defined as
+ * `var(--itself)`. The host's stylesheet is the source of truth for these
+ * values (`react-blender-nodes/src/index.css` › `@theme inline`); the names
+ * match so app markup reads the same as host markup.
+ *
+ * `static` forces every variable to be emitted even when it is referenced only
+ * from a JS string or an inline style, which the canvas previews do. */
+@theme static {
+  --color-primary-white: #e6e6e6;
+  --color-primary-black: #1d1d1d;
+  --color-secondary-black: #282828;
+  --color-primary-dark-gray: #303030;
+  --color-secondary-dark-gray: #444444;
+  --color-primary-gray: #545454;
+  --color-secondary-light-gray: #656565;
+  --color-primary-light-gray: #797979;
+
+  /* Also the HOST's, and needed here for the same reason as the grays above:
+   * `AutoRunControl` writes `bg-status-completed` / `bg-status-warning` for the
+   * freshness dot and `border-primary-blue bg-primary-blue/25` for the enabled
+   * toggle. Those utilities have been resolving out of the HOST's stylesheet,
+   * which works only for as long as the host emits them UNPREFIXED. Declaring
+   * the tokens here makes the app's own sheet the supplier, so the dot keeps
+   * its green/orange fill and the toggle its blue tint regardless. */
+  --color-primary-blue: #4772b3;
+  --color-status-completed: #4caf50;
+  --color-status-warning: #ffa500;
+  /* The library sidebar's error strip (`bg-status-errored/15`). Same value as
+   * the host's token, declared here for the same reason as the two above. */
+  --color-status-errored: #ff4444;
+
+  /* App-only: the Demos button's gradient, its border and its text. The one
+   * deliberately loud control in the toolbar. */
+  --color-demos-from: #6a3df5;
+  --color-demos-via: #b444d8;
+  --color-demos-to: #ff5f9e;
+  --color-demos-border: #7b5cff;
+  --color-demos-text: #fdf6ff;
+
+  /* The live readout under a signal preview. */
+  --color-signal-readout: #f59e0b;
+
+  --animate-demos-sheen: demos-sheen 4.5s ease-in-out infinite;
+}
+
+/* The sheen that sweeps across the Demos button. Held at rest for most of the
+ * cycle so it reads as an occasional glint rather than a spinner. */
+@keyframes demos-sheen {
+  0%,
+  62% {
+    transform: translateX(-120%);
+  }
+  86%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@layer base {
+  /* The app owns the whole viewport: the graph canvas needs a definite height
+   * to lay out against, which it can only inherit from a chain of sized
+   * ancestors starting at <html>. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    background-color: var(--color-primary-black);
+    color: var(--color-primary-white);
+    font-family: system-ui, sans-serif;
+  }
+}
+
+/* The app while the landing stage covers it completely: laid out (ReactFlow
+   keeps measuring and fitting) but never painted. `!important` because
+   ReactFlow sets an inline `visibility: visible` on every measured node,
+   which would otherwise override the inherited `hidden`. */
+.app-covered,
+.app-covered * {
+  visibility: hidden !important;
+}

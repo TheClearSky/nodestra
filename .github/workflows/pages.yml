@@ -1,0 +1,81 @@
+name: Deploy to GitHub Pages
+
+# The site (landing at /, the app at /app) is built and published by CI only —
+# never by hand. Pushes to main deploy; pull requests build and test only.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    concurrency: ci-${{ github.ref }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The DSP render tests synthesise seconds of audio offline; vitest's
+      # 5 s default is too tight on a shared runner.
+      - name: Unit tests
+        run: npm run test:unit -- --testTimeout=30000
+
+      # Pages serves the site under /<repo>/; Vite's base, the router's
+      # basename, the worklets and the landing tour all follow BASE_PATH.
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      # GitHub Pages has no rewrites. /app is the real page people link to,
+      # so it gets its own index.html and loads with a 200; every other route
+      # falls through to 404.html — the same page, so the router takes over
+      # (it renders fine, but with a 404 status).
+      - name: SPA routes
+        run: |
+          mkdir -p dist/app
+          cp dist/index.html dist/app/index.html
+          cp dist/index.html dist/404.html
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Only this job may publish to Pages.
+    permissions:
+      id-token: write
+      pages: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      # `id` is load-bearing: the environment url above reads its output.
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
