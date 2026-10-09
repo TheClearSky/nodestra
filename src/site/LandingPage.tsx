@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { createStageScene } from '../landing/stageScene';
-import { UiShot } from './UiShot';
+import { loadFrame, loadTour } from '../showcase/loaders';
+import { LiveSlot } from '../showcase/LiveSlot';
+import { isConstrainedDevice } from '../showcase/liveScheduler';
+import { ShowcasePoster } from '../showcase/ShowcasePoster';
 import {
   FEATURES,
   GOLD,
   OpenAppButton,
   SCREENS,
-  SHOTS,
   SiteFooter,
   SiteNav,
   SUBLINE,
@@ -14,7 +16,6 @@ import {
   usePageTitle,
   useReducedMotion,
 } from './shared';
-import { TourPlayer } from './TourPlayer';
 import { CurtainCTA, EmberCard, Embers, ImpactFilters, Proscenium, STAGE_CSS } from './stageEffects';
 import '../index.css';
 
@@ -78,7 +79,12 @@ function StageHero({ reduced }: { reduced: boolean }) {
     const stage = createStageScene(canvas, { reducedMotion: reduced, idleMotion: 3 });
     const ro = new ResizeObserver(([e]) => stage.resize(e.contentRect.width, e.contentRect.height));
     ro.observe(box);
-    return () => { ro.disconnect(); stage.dispose(); };
+    // Scrolled away, the stage stops drawing: the rest of the page gets the
+    // frame budget, and the stage's own quality ladder is not pushed down by
+    // what other sections cost.
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) stage.resume(); else stage.pause(); });
+    io.observe(box);
+    return () => { io.disconnect(); ro.disconnect(); stage.dispose(); };
   }, [reduced]);
 
   // Steering ends with Escape, or as soon as the hero scrolls out of view.
@@ -169,7 +175,7 @@ function PlayingCard({ shot, index, reduced }: { shot: (typeof SCREENS)[number];
         style={{ transform: rest, transformStyle: 'preserve-3d', animationDelay: `${index * -1.3}s` }}
       >
         <div className='relative overflow-hidden rounded-[16.5px] bg-[#0f0b09]'>
-          <UiShot src={`${SHOTS}/${shot.file}.html`} title={shot.title} crop={shot.crop} />
+          <LiveSlot load={loadFrame} props={{ query: shot.showcase }} poster={<ShowcasePoster title={shot.title} />} label={shot.title} crop={shot.crop} />
           <p className='px-4 py-3 text-[14px] text-[#f4ead8]/90'>{shot.caption}</p>
           {/* gloss: a sheen that sweeps across, and follows the pointer on hover */}
           <span aria-hidden='true' className='s5sheen pointer-events-none absolute inset-0' style={{ animationDelay: `${index * 0.9}s` }} />
@@ -215,6 +221,21 @@ ${STAGE_CSS}
 @media (prefers-reduced-motion: reduce) { .s5card, .s5sheen { animation: none } }
 `;
 
+/** The tour is the heaviest thing on the page (a second three.js stage and
+ *  ten app screens): on phones, tablets and low-end machines it waits for a
+ *  tap instead of starting as it scrolls in (measured ~2 fps while it played
+ *  on an emulated phone, CPU /4). */
+const TOUR_WAITS_FOR_TAP = isConstrainedDevice() || window.matchMedia('(pointer: coarse)').matches;
+
+/** The tour's place-holder until it scrolls near: the stage, dark, waiting. */
+function TourPoster() {
+  return (
+    <div className='grid h-full w-full place-items-center bg-black'>
+      <p className='font-serif text-[13px] tracking-[0.4em] uppercase' style={{ color: GOLD }}>The tour</p>
+    </div>
+  );
+}
+
 function LandingPage() {
   usePageTitle('Nodestra — build instruments and songs from nodes');
   const reduced = useReducedMotion();
@@ -227,14 +248,14 @@ function LandingPage() {
         <StageHero reduced={reduced} />
         <ImpactSection id='tour' reduced={reduced} className='relative mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6'>
           <Proscenium>
-            <TourPlayer />
+            <LiveSlot load={loadTour} props={{}} fit='fill' tryIt={false} nearMargin='0px' farMargin='50% 0px' waitForTap={TOUR_WAITS_FOR_TAP} tapLabel='▶ Play the tour' poster={<TourPoster />} label='Nodestra — an animated tour of the app' />
           </Proscenium>
         </ImpactSection>
         <ImpactSection aria-labelledby='screens-title' id='screens' reduced={reduced} className='relative scroll-mt-20 border-t border-[#e9d3a8]/10'>
           <div className='mx-auto flex max-w-6xl flex-col gap-10 px-4 py-16 sm:px-6'>
             <h2 id='screens-title' className='font-serif text-[30px] text-[#f4ead8] sm:text-[38px]'>What you see when you open it</h2>
             <ul className='grid gap-10 sm:grid-cols-2 lg:grid-cols-3'>
-              {SCREENS.map((s, i) => <PlayingCard key={s.file} shot={s} index={i} reduced={reduced} />)}
+              {SCREENS.map((s, i) => <PlayingCard key={s.key} shot={s} index={i} reduced={reduced} />)}
             </ul>
           </div>
         </ImpactSection>

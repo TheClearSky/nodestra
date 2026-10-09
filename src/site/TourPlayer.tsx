@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { LiveComponentProps } from '../showcase/LiveSlot';
 import { GOLD, TOUR_SRC } from './shared';
 
 /*
@@ -51,10 +52,20 @@ function SkipGlyph({ dir }: { dir: -1 | 1 }) {
   );
 }
 
-function TourPlayer() {
+/**
+ * A live showcase (`showcase/LiveSlot`, fit 'fill'): the slot mounts it only
+ * near the viewport and unmounts it far away — the tour is a second three.js
+ * stage plus ten app screens, the heaviest thing on the page. Off screen it
+ * pauses, and it resumes only if it was the one that paused (a visitor's own
+ * pause stays a pause).
+ */
+function TourPlayer({ visible, onReady }: LiveComponentProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [playing, setPlaying] = useState(true);
   const [nudge, setNudge] = useState<-1 | 0 | 1>(0);
+  const pausedForScrollRef = useRef(false);
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
 
   useEffect(() => {
     const frame = frameRef.current; if (!frame) return undefined;
@@ -63,8 +74,16 @@ function TourPlayer() {
     const attach = () => {
       win = frame.contentWindow as TourWindow | null;
       if (!win) return;
-      win.addEventListener('tourplaying', onPlaying);
+      try {
+        win.addEventListener('tourplaying', onPlaying);
+      } catch {
+        // The tour failed to load and the frame holds the browser's (cross-
+        // origin) error page: no controls to drive, and no page error.
+        win = null;
+        return;
+      }
       setPlaying(win.__tour?.isPlaying() ?? true);
+      readyRef.current();
     };
     frame.addEventListener('load', attach);
     if (frame.contentDocument?.readyState === 'complete') attach();
@@ -72,6 +91,18 @@ function TourPlayer() {
   }, []);
 
   const tour = () => (frameRef.current?.contentWindow as TourWindow | null)?.__tour;
+
+  useEffect(() => {
+    const api = (frameRef.current?.contentWindow as TourWindow | null)?.__tour;
+    if (!api) return;
+    if (!visible && api.isPlaying()) {
+      api.toggle();
+      pausedForScrollRef.current = true;
+    } else if (visible && pausedForScrollRef.current) {
+      pausedForScrollRef.current = false;
+      if (!api.isPlaying()) api.toggle();
+    }
+  }, [visible]);
   const skip = (dir: -1 | 1) => {
     tour()?.skipBy(dir * 10);
     setNudge(dir);

@@ -128,6 +128,35 @@ type TutorialLayerProps = {
   onOfferDismiss(): void;
 };
 
+/** Blip's first-run offer: show the piano tutorial, or just open the demo.
+ *  Also shown, live, on the landing page (`showcase/WelcomeShowcase`). */
+function BlipOffer({ onTutorial, onJustOpen, onDismiss }: { onTutorial(): void; onJustOpen(): void; onDismiss(): void }) {
+  return (
+    <Dock
+      side='right'
+      label='Blip, your guide'
+      blip={<BlipCharacter mood='happy' speech={plain([{ say: OFFER_TEXT }])} focus={null} pointing={false} />}
+    >
+      <div className='flex items-center'>
+        <p className='mr-auto text-[11px] font-semibold tracking-wide text-[#b444d8] uppercase'>♪ Blip</p>
+        <VoiceToggle />
+      </div>
+      <p>{renderInline(OFFER_TEXT)}</p>
+      <div className='flex flex-wrap justify-end gap-1.5'>
+        <button type='button' className={BUTTON} onClick={onDismiss}>
+          Not now
+        </button>
+        <button type='button' className={BUTTON} onClick={onJustOpen}>
+          Just open it
+        </button>
+        <button type='button' className={PRIMARY} autoFocus onClick={onTutorial}>
+          Show me how
+        </button>
+      </div>
+    </Dock>
+  );
+}
+
 function TutorialLayer({ controller, view, offer, onOfferTutorial, onOfferJustOpen, onOfferDismiss }: TutorialLayerProps) {
   const [confirmSkip, setConfirmSkip] = useState(false);
   const running = view?.status === 'running' && controller !== null;
@@ -148,30 +177,7 @@ function TutorialLayer({ controller, view, offer, onOfferTutorial, onOfferJustOp
   }, [running]);
 
   if (!running && offer) {
-    return (
-      <Dock
-        side='right'
-        label='Blip, your guide'
-        blip={<BlipCharacter mood='happy' speech={plain([{ say: OFFER_TEXT }])} focus={null} pointing={false} />}
-      >
-        <div className='flex items-center'>
-          <p className='mr-auto text-[11px] font-semibold tracking-wide text-[#b444d8] uppercase'>♪ Blip</p>
-          <VoiceToggle />
-        </div>
-        <p>{renderInline(OFFER_TEXT)}</p>
-        <div className='flex flex-wrap justify-end gap-1.5'>
-          <button type='button' className={BUTTON} onClick={onOfferDismiss}>
-            Not now
-          </button>
-          <button type='button' className={BUTTON} onClick={onOfferJustOpen}>
-            Just open it
-          </button>
-          <button type='button' className={PRIMARY} autoFocus onClick={onOfferTutorial}>
-            Show me how
-          </button>
-        </div>
-      </Dock>
-    );
+    return <BlipOffer onTutorial={onOfferTutorial} onJustOpen={onOfferJustOpen} onDismiss={onOfferDismiss} />;
   }
   if (!running || !view || !view.step) return null;
 
@@ -270,4 +276,4 @@ function TutorialLayer({ controller, view, offer, onOfferTutorial, onOfferJustOp
   );
 }
 
-export { renderInline, TutorialLayer };
+export { BlipOffer, renderInline, TutorialLayer };

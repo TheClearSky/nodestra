@@ -92,4 +92,14 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // Two pages: the site (landing + app) and the live-showcase frame the
+  // landing page's screens run in (`src/showcase/frame/main.tsx`).
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        showcase: fileURLToPath(new URL('./showcase.html', import.meta.url)),
+      },
+    },
+  },
 });

@@ -12,6 +12,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { createStageAdaptive, detectStageTier, stageLadder } from './stageQuality';
 
 type StageScene = {
   resize(width: number, height: number): void;
@@ -27,6 +28,9 @@ type StageScene = {
   setLive(live: boolean): void;
   /** A key (0 = A0 … 87 = C8) pressed or released by a player. */
   setLiveKey(key: number, down: boolean): void;
+  /** Diagnostics: the quality tier, why it was picked, and where the runtime
+   *  ladder has taken it (also mirrored on `canvas.dataset.quality`). */
+  quality(): string;
   dispose(): void;
 };
 
@@ -781,6 +785,7 @@ const beamFragment = /* glsl */ `
 const dustVertex = /* glsl */ `
   uniform float uTime;
   uniform float uPixelRatio;
+  uniform float uKeep;
   attribute float aSeed;
   varying float vTwinkle;
   void main() {
@@ -798,7 +803,11 @@ const dustVertex = /* glsl */ `
          + cos(uTime * 0.59 * jitter + aSeed * 23.0) * 0.03;
     vec4 view = modelViewMatrix * vec4(p, 1.0);
     vTwinkle = 0.45 + 0.55 * sin(uTime * (0.8 + aSeed) + aSeed * 40.0);
-    gl_PointSize = (1.2 + aSeed * 2.2) * uPixelRatio * (6.0 / -view.z);
+    // The adaptive quality thins the dust by shrinking motes away (size 0 =
+    // no fragments), keyed on a hash of the seed so the ones kept are a fair
+    // sample of every size. uKeep 2 keeps all: the factor is exactly 1.
+    float keep = clamp((uKeep - fract(aSeed * 91.7)) / 0.05, 0.0, 1.0);
+    gl_PointSize = (1.2 + aSeed * 2.2) * uPixelRatio * (6.0 / -view.z) * keep;
     gl_Position = projectionMatrix * view;
   }
 `;
@@ -893,6 +902,7 @@ function makeDust(beam: Beam, radius: number, count: number, time: { value: numb
     uniforms: {
       uTime: time,
       uPixelRatio: { value: pixelRatio },
+      uKeep: { value: 2 },
       uColor: { value: new THREE.Color(1.0, 0.86, 0.62).multiplyScalar(0.9) },
     },
     vertexShader: dustVertex,
@@ -905,7 +915,7 @@ function makeDust(beam: Beam, radius: number, count: number, time: { value: numb
   points.position.copy(beam.mesh.position);
   points.quaternion.copy(beam.mesh.quaternion);
   points.renderOrder = 11;
-  return points;
+  return { points, material };
 }
 
 // ── environment for reflections ─────────────────────────────────────────
@@ -947,8 +957,14 @@ function makeEnvironment(renderer: THREE.WebGLRenderer): THREE.Texture {
 // ── the scene ───────────────────────────────────────────────────────────
 
 function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): StageScene {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
+  // Quality: the tier is guessed once from the device (stageQuality.ts);
+  // HIGH is the stage exactly as it was before tiers existed. The runtime
+  // ladder (below, `applyLevel`) only ever goes down from the tier.
+  const guess = detectStageTier();
+  const tier = guess.params;
+  const ladder = stageLadder(tier, window.devicePixelRatio || 1);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: tier.antialias, powerPreference: 'high-performance' });
+  let pixelRatio = ladder[0].pixelRatio;
   renderer.setPixelRatio(pixelRatio);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
@@ -1081,7 +1097,7 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   spot.position.copy(spotPosition);
   spot.target.position.copy(spotTarget);
   spot.castShadow = true;
-  spot.shadow.mapSize.set(2048, 2048);
+  spot.shadow.mapSize.set(tier.shadowMap, tier.shadowMap);
   spot.shadow.camera.near = 4;
   spot.shadow.camera.far = 12;
   spot.shadow.bias = -0.0003;
@@ -1111,10 +1127,18 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     makeBeam(new THREE.Vector3(4.6, 8.5, -2.0), new THREE.Vector3(2.0, 0, -3.4), 1.2, new THREE.Color(0.55, 0.62, 1.0), 0.045, 5.3, time),
   ];
   for (const beam of beams) scene.add(beam.mesh);
-  scene.add(makeDust(beams[0], 2.35, 700, time, pixelRatio));
+  const dust = makeDust(beams[0], 2.35, tier.dust, time, pixelRatio);
+  scene.add(dust.points);
+  /** Share of the dust drawn (1 = all; the ladder's last level halves it,
+   *  easing there so no mote pops out). */
+  let dustKeep = 1;
+  let dustKeepWanted = 1;
 
   // Motes that rise from each string as it is struck.
-  const MOTES = 220;
+  const MOTES = tier.motes;
+  /** The ring new motes are emitted into; the ladder can shrink it — motes
+   *  past it finish their short lives, so none vanishes mid-air. */
+  let moteRing = MOTES;
   const motePositions = new Float32Array(MOTES * 3);
   const moteAlpha = new Float32Array(MOTES);
   const moteVelocity = new Float32Array(MOTES * 3);
@@ -1134,6 +1158,7 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
       blending: THREE.AdditiveBlending,
     }),
   );
+  const moteMaterial = motes.material as THREE.ShaderMaterial;
   motes.frustumCulled = false;
   motes.renderOrder = 12;
   scene.add(motes);
@@ -1143,8 +1168,8 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     const origin = piano.stringMid[key].clone();
     origin.z += (moteRandom() - 0.5) * 0.3;
     piano.group.localToWorld(origin);
-    const i = nextMote;
-    nextMote = (nextMote + 1) % MOTES;
+    const i = nextMote % moteRing;
+    nextMote = (i + 1) % moteRing;
     motePositions.set([origin.x, origin.y, origin.z], i * 3);
     moteVelocity.set([(moteRandom() - 0.5) * 0.08, 0.16 + moteRandom() * 0.14, (moteRandom() - 0.5) * 0.08], i * 3);
     moteMaxLife[i] = 2.2 + moteRandom() * 1.6;
@@ -1174,9 +1199,93 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   const basePosition = new THREE.Vector3(0.6, 2.35, 9.6);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.6, 2.6);
+  const BLOOM_STRENGTH = 0.55;
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_STRENGTH, 0.6, 2.6);
+  // The bloom's targets follow the composer's size times a resolution scale
+  // (full on HIGH, half on MEDIUM, off on LOW). Its threshold is 2.6: only
+  // the footlights, motes and the spot's glints bloom, and a blur of those
+  // looks the same at half resolution. Scale 1 passes the size through
+  // untouched, so HIGH is the pass exactly as before.
+  let bloomScale = tier.bloom;
+  /** The level's bloom scale; 0 fades the bloom out, then turns it off. */
+  let bloomWanted = tier.bloom;
+  const bloomSize = { width: 1, height: 1 };
+  const setBloomSize = bloom.setSize.bind(bloom);
+  bloom.setSize = (width: number, height: number) => {
+    bloomSize.width = width;
+    bloomSize.height = height;
+    if (bloomScale === 1) setBloomSize(width, height);
+    else setBloomSize(Math.max(2, Math.round(width * bloomScale)), Math.max(2, Math.round(height * bloomScale)));
+  };
+  const resizeBloom = (scale: number) => {
+    if (scale === bloomScale) return;
+    bloomScale = scale;
+    bloom.setSize(bloomSize.width, bloomSize.height);
+  };
+  if (tier.bloom === 0) {
+    bloom.enabled = false;
+    bloom.strength = 0;
+  }
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+
+  // Runtime adaptation (stageQuality.ts): a level is applied just before a
+  // frame is drawn, so a resize never shows an empty canvas. Pixel ratio
+  // and bloom resolution change at once (a slight softening); the bloom's
+  // switch-off and the dust's thinning ease over a second or two.
+  const describeQuality = () => {
+    const level = ladder[adaptive.level()];
+    return (
+      `${tier.tier}${adaptive.label()} (${guess.reasons.join(', ')}; ` +
+      `pr ${level.pixelRatio.toFixed(2)}, bloom ${level.bloom === 0 ? 'off' : level.bloom}, ` +
+      `shadow ${tier.shadowMap}, dust ${level.dust}, motes ${level.motes})`
+    );
+  };
+  const markQuality = () => {
+    const level = adaptive.level();
+    canvas.dataset.quality = level === 0 ? tier.tier : `${tier.tier}-${level}`;
+  };
+  const applyLevel = (index: number) => {
+    const level = ladder[index];
+    if (Math.abs(level.pixelRatio - pixelRatio) > 1e-3) {
+      pixelRatio = level.pixelRatio;
+      renderer.setPixelRatio(pixelRatio); // re-sizes the canvas's buffer
+      composer.setPixelRatio(pixelRatio); // and every pass's targets
+      dust.material.uniforms.uPixelRatio.value = pixelRatio;
+      moteMaterial.uniforms.uPixelRatio.value = pixelRatio;
+    }
+    bloomWanted = level.bloom;
+    if (level.bloom > 0) {
+      resizeBloom(level.bloom);
+      bloom.enabled = true; // fades back in from wherever it was
+    }
+    dustKeepWanted = level.dust / tier.dust;
+    moteRing = level.motes;
+    markQuality();
+  };
+  const adaptive = createStageAdaptive(ladder.length, applyLevel, {
+    enabled: !guess.forced && !options.reducedMotion,
+  });
+  markQuality();
+  /** Ease the bloom and the dust towards the current level. */
+  const stepQuality = (dt: number) => {
+    const strength = bloomWanted > 0 ? BLOOM_STRENGTH : 0;
+    if (bloom.strength !== strength) {
+      const step = (BLOOM_STRENGTH / 1.2) * dt;
+      bloom.strength =
+        strength > bloom.strength ? Math.min(strength, bloom.strength + step) : Math.max(strength, bloom.strength - step);
+      if (bloom.strength === 0 && bloomWanted === 0) {
+        bloom.enabled = false;
+        resizeBloom(0); // frees the targets' memory
+      }
+    }
+    if (dustKeep !== dustKeepWanted) {
+      const step = dt / 2;
+      dustKeep =
+        dustKeepWanted > dustKeep ? Math.min(dustKeepWanted, dustKeep + step) : Math.max(dustKeepWanted, dustKeep - step);
+      dust.material.uniforms.uKeep.value = dustKeep >= 1 ? 2 : dustKeep;
+    }
+  };
 
   // Drag to look around the stage a little: an orbit about the piano,
   // clamped so the curtains always frame the view, and eased so it glides.
@@ -1424,11 +1533,19 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   let live = false;
   const held = new Uint8Array(KEY_COUNT);
   const MIN_FRAME_MS = 1000 / 61;
+  /** An animation frame was skipped by the cap since the last render. */
+  let capped = false;
   const frame = () => {
     const now = performance.now();
-    if (now - previous < MIN_FRAME_MS) return;
+    if (now - previous < MIN_FRAME_MS) {
+      capped = true;
+      return;
+    }
+    adaptive.frame(now, capped);
+    capped = false;
     const dt = Math.min(0.05, (now - previous) / 1000);
     previous = now;
+    stepQuality(dt);
     const t = (now - start) / 1000;
     time.value = t;
     swayUniform.value = t;
@@ -1477,7 +1594,26 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     }
   };
 
-  if (!options.reducedMotion) renderer.setAnimationLoop(frame);
+  // The loop runs unless the owner paused the stage OR the tab is hidden
+  // (browsers throttle a hidden tab's animation frames, not always to zero,
+  // and a frame nobody sees is wasted battery). Each is its own reason: a
+  // stage paused by its owner stays paused when the tab comes back.
+  let ownerPaused = false;
+  let disposed = false;
+  let looping = false;
+  const syncLoop = () => {
+    const run = !options.reducedMotion && !ownerPaused && !disposed && !document.hidden;
+    if (run === looping) return;
+    looping = run;
+    if (run) {
+      // The gap is not a slow frame; the first frames back warm up again.
+      adaptive.reset();
+      capped = false;
+    }
+    renderer.setAnimationLoop(run ? frame : null);
+  };
+  document.addEventListener('visibilitychange', syncLoop);
+  syncLoop();
 
   return {
     resize,
@@ -1499,7 +1635,8 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
       camera.updateProjectionMatrix();
     },
     pause() {
-      renderer.setAnimationLoop(null);
+      ownerPaused = true;
+      syncLoop();
     },
     resume() {
       if (options.reducedMotion) {
@@ -1507,7 +1644,8 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
         return;
       }
       // The frame step is capped, so the time spent paused is not replayed.
-      renderer.setAnimationLoop(frame);
+      ownerPaused = false;
+      syncLoop();
     },
     setLive(next) {
       if (next === live) return;
@@ -1538,8 +1676,12 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
         composer.render(0);
       }
     },
+    quality: describeQuality,
     dispose() {
+      disposed = true;
+      syncLoop();
       renderer.setAnimationLoop(null);
+      document.removeEventListener('visibilitychange', syncLoop);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
