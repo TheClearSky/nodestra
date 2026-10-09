@@ -1,5 +1,6 @@
 /**
- * Function implementations — the ONE Tone-importing seam.
+ * Function implementations — the ONE Tone-importing seam (with its effect
+ * half, `effectAudio.ts`; graph DESCRIPTIONS never import either).
  *
  * Discipline:
  * - the free `Tone.connect` ONLY — member `.connect()` on Signal-family
@@ -39,8 +40,9 @@ import { applySignalReading } from './signalApply';
 import { dftToPeriodicCoefficients, sinePreset } from './waveformMath';
 import { divisionSeconds, mapPercent } from './controlMath';
 import type { SoundNodeTypeId } from './nodeTypes';
-import type { EffectNode, EffectRow } from './effectTable';
-import { effectRows } from './effectTable';
+import type { EffectRowId } from './effectTable';
+import type { BoundEffectRow, EffectNode } from './effectAudio';
+import { boundEffectRows } from './effectAudio';
 import {
   areWorkletsRegistered,
   getMasterInput,
@@ -370,7 +372,7 @@ function registerNativeSource(node: {
 
 // ── Effect-table factory ──
 
-function makeEffectImplementation(row: EffectRow): FnImpl {
+function makeEffectImplementation(row: BoundEffectRow): FnImpl {
   return async (inputs, _outputs, context) => {
     ensureBuild(context.abortSignal);
     const myBuild = getCurrentBuildId();
@@ -406,8 +408,8 @@ function makeEffectImplementation(row: EffectRow): FnImpl {
 }
 
 const effectImplementations = Object.fromEntries(
-  effectRows.map((row) => [row.id, makeEffectImplementation(row)]),
-) as Record<(typeof effectRows)[number]['id'], FnImpl>;
+  boundEffectRows.map((row) => [row.id, makeEffectImplementation(row)]),
+) as Record<EffectRowId, FnImpl>;
 
 // ── The catalog ──
 

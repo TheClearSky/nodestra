@@ -13,6 +13,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createStageAdaptive, detectStageTier, stageLadder } from './stageQuality';
+import { createRenderGate } from './renderGate';
 
 type StageScene = {
   resize(width: number, height: number): void;
@@ -1528,7 +1529,10 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   };
 
   let previous = performance.now();
-  const start = previous;
+  /** The stage's own clock (s): it advances only while frames are drawn, so
+   *  a stage that was paused, off screen or in a hidden tab carries on where
+   *  it stopped — no catch-up, no jump. */
+  let elapsed = 0;
   let previousLoopTime = 0;
   let live = false;
   const held = new Uint8Array(KEY_COUNT);
@@ -1543,10 +1547,13 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     }
     adaptive.frame(now, capped);
     capped = false;
-    const dt = Math.min(0.05, (now - previous) / 1000);
+    // Real time, capped: a stalled frame slows the stage, it does not skip.
+    const step = Math.min(0.25, (now - previous) / 1000);
+    const dt = Math.min(0.05, step);
     previous = now;
+    elapsed += step;
     stepQuality(dt);
-    const t = (now - start) / 1000;
+    const t = elapsed;
     time.value = t;
     swayUniform.value = t;
 
@@ -1594,25 +1601,25 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     }
   };
 
-  // The loop runs unless the owner paused the stage OR the tab is hidden
-  // (browsers throttle a hidden tab's animation frames, not always to zero,
-  // and a frame nobody sees is wasted battery). Each is its own reason: a
-  // stage paused by its owner stays paused when the tab comes back.
-  let ownerPaused = false;
-  let disposed = false;
+  // The loop runs only while the render gate is open: not paused by the
+  // owner, tab visible, canvas in the screen's view (renderGate.ts). A stage
+  // paused by its owner stays paused when it scrolls or tabs back into view.
   let looping = false;
   const syncLoop = () => {
-    const run = !options.reducedMotion && !ownerPaused && !disposed && !document.hidden;
+    const run = !options.reducedMotion && gate.isOpen();
     if (run === looping) return;
     looping = run;
     if (run) {
-      // The gap is not a slow frame; the first frames back warm up again.
+      // Restart the frame clock one frame back: the first frame draws at
+      // once, with a normal step. The gap is not a slow frame either; the
+      // adaptive quality warms up again.
+      previous = performance.now() - 1000 / 60;
       adaptive.reset();
       capped = false;
     }
     renderer.setAnimationLoop(run ? frame : null);
   };
-  document.addEventListener('visibilitychange', syncLoop);
+  const gate = createRenderGate(canvas, syncLoop);
   syncLoop();
 
   return {
@@ -1635,17 +1642,12 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
       camera.updateProjectionMatrix();
     },
     pause() {
-      ownerPaused = true;
-      syncLoop();
+      gate.setPaused(true);
     },
     resume() {
-      if (options.reducedMotion) {
-        composer.render(0);
-        return;
-      }
-      // The frame step is capped, so the time spent paused is not replayed.
-      ownerPaused = false;
-      syncLoop();
+      gate.setPaused(false);
+      // Reduced motion has no loop: show the still frame again.
+      if (options.reducedMotion) composer.render(0);
     },
     setLive(next) {
       if (next === live) return;
@@ -1678,10 +1680,8 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     },
     quality: describeQuality,
     dispose() {
-      disposed = true;
-      syncLoop();
+      gate.dispose();
       renderer.setAnimationLoop(null);
-      document.removeEventListener('visibilitychange', syncLoop);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);

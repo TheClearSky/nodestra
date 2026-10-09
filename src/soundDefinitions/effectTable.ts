@@ -1,21 +1,39 @@
 /**
- * The table-driven effect catalog: one row per Tone effect class;
- * `nodeTypes.ts` generates the node definitions and `implementations.ts`
- * generates the implementations from these rows.
+ * The table-driven effect catalog: one row per Tone effect class.
+ * `nodeTypes.ts` generates the node definitions from these rows, and
+ * `effectAudio.ts` binds each row to its Tone class for `implementations.ts`.
+ *
+ * THIS FILE IS METADATA ONLY, and must never import `tone`. Measured
+ * 2026-10-09 with an esbuild metafile: when the Tone factories lived in these
+ * rows, `nodeTypes.ts` pulled all of Tone (183 modules) into anything that
+ * merely DESCRIBES a graph — every landing-page showcase frame among them,
+ * each of which then created an AudioContext and logged "AudioContext was
+ * not allowed to start". The audio half lives in `effectAudio.ts`, keyed by
+ * the ids below; the type there makes a missing or extra binding a compile
+ * error, and `effectTableSplit.test.ts` checks the same at runtime.
  *
  * Per-param kinds were verified against the INSTALLED Tone 15.1.22 d.ts:
  * `signal` = the target is a live Param/Signal (schedulable +
  * connectable), `number` = a plain property Tone reads on assignment.
  * Getting this wrong is a silent-behavior bug class.
- *
- * Closures cast `node` to the concrete class — the row data IS the seam
- * between the generic factory and Tone's heterogeneous classes.
  */
 
-import * as Tone from 'tone';
-import type { ParamLike } from './valueTypes';
+type EffectSignalParam = {
+  input: string;
+  /** In-app documentation shown behind the socket's info icon. */
+  description?: string;
+  fallback: number;
+  /** Mod-domain declaration; defaults to 'normal' (0–1-ish native
+   *  range). */
+  modDomain?: 'linear' | 'dB-native' | 'Hz' | 's' | 'normal' | 'bits';
+};
 
-type EffectNode = { dispose: () => unknown };
+type EffectNumberParam = {
+  input: string;
+  /** In-app documentation shown behind the socket's info icon. */
+  description?: string;
+  fallback: number;
+};
 
 type EffectRow = {
   /** Node type id (camelCase) and display name. */
@@ -24,33 +42,10 @@ type EffectRow = {
   /** In-app documentation shown behind the node title's info icon. */
   description?: string;
   headerColor: string;
-  make: () => EffectNode;
   /** Params whose Tone target is a Param/Signal → `signal` inputs. */
-  signalParams: ReadonlyArray<{
-    input: string;
-    /** In-app documentation shown behind the socket's info icon. */
-    description?: string;
-    fallback: number;
-    target: (node: EffectNode) => ParamLike;
-    /** Replace-on-connect base when 0 is not silent/legal in the param's
-     *  native domain; defaults to 0. */
-    replaceBase?: number;
-    /** Mod-domain declaration; defaults to 'normal' (0–1-ish native
-     *  range). */
-    modDomain?: 'linear' | 'dB-native' | 'Hz' | 's' | 'normal' | 'bits';
-  }>;
+  signalParams: ReadonlyArray<EffectSignalParam>;
   /** Plain-property params → `number` inputs (defaultValue-seeded knobs). */
-  numberParams: ReadonlyArray<{
-    input: string;
-    /** In-app documentation shown behind the socket's info icon. */
-    description?: string;
-    fallback: number;
-    apply: (node: EffectNode, value: number) => void;
-  }>;
-  /** LFO-driven effects must `.start()`. */
-  needsStart?: boolean;
-  /** Async-ready effects (Reverb) are awaited before connecting. */
-  awaitReady?: (node: EffectNode) => Promise<unknown>;
+  numberParams: ReadonlyArray<EffectNumberParam>;
 };
 
 const wetParam = {
@@ -58,8 +53,7 @@ const wetParam = {
   description:
     'How much of the effected sound you hear vs. the original, 0–1 (1 = effect only).',
   fallback: 1,
-  target: (node: EffectNode) => (node as unknown as { wet: ParamLike }).wet,
-};
+} as const;
 
 const effectRows = [
   {
@@ -68,19 +62,12 @@ const effectRows = [
     description:
       'Harsh, gritty overdrive that clips the sound, like a guitar distortion pedal.',
     headerColor: '#9a3412',
-    make: () => new Tone.Distortion({ distortion: 0.4 }),
     signalParams: [wetParam],
     numberParams: [
       {
         input: 'Amount',
         description: 'How much distortion, 0 (clean) to 1 (heavy).',
         fallback: 0.4,
-        apply: (node, value) => {
-          (node as Tone.Distortion).distortion = Math.min(
-            1,
-            Math.max(0, value),
-          );
-        },
       },
     ],
   },
@@ -90,7 +77,6 @@ const effectRows = [
     description:
       'Distortion that adds a chosen set of extra overtones. Odd and even Order values sound quite different.',
     headerColor: '#9a3412',
-    make: () => new Tone.Chebyshev({ order: 4 }),
     signalParams: [wetParam],
     numberParams: [
       {
@@ -98,9 +84,6 @@ const effectRows = [
         description:
           'Which overtone the sound is bent toward. 1 leaves it unchanged; higher is buzzier and brighter.',
         fallback: 4,
-        apply: (node, value) => {
-          (node as Tone.Chebyshev).order = Math.max(1, Math.round(value));
-        },
       },
     ],
   },
@@ -110,7 +93,6 @@ const effectRows = [
     description:
       'Lo-fi grit: lowers the sound’s resolution, like an old video game or early sampler.',
     headerColor: '#9a3412',
-    make: () => new Tone.BitCrusher({ bits: 4 }),
     signalParams: [
       wetParam,
       {
@@ -118,9 +100,6 @@ const effectRows = [
         description:
           'Resolution in bits (1–16). Fewer bits sound noisier and crunchier; the default 4 is heavily crushed.',
         fallback: 4,
-        target: (node) => (node as Tone.BitCrusher).bits,
-        // Param minValue is 1 — a zero base THROWS assertRange.
-        replaceBase: 1,
         modDomain: 'bits',
       },
     ],
@@ -132,7 +111,6 @@ const effectRows = [
     description:
       'Thickens a sound by layering slightly delayed, wavering copies of it, like several players in unison.',
     headerColor: '#155e75',
-    make: () => new Tone.Chorus({ frequency: 1.5, delayTime: 3.5, depth: 0.7 }),
     signalParams: [
       wetParam,
       {
@@ -140,7 +118,6 @@ const effectRows = [
         description:
           'How fast the copies waver, in times per second (default 1.5).',
         fallback: 1.5,
-        target: (node) => (node as Tone.Chorus).frequency,
         modDomain: 'Hz',
       },
     ],
@@ -150,20 +127,13 @@ const effectRows = [
         description:
           'How far behind the original the copies sit, in milliseconds (default 3.5).',
         fallback: 3.5,
-        apply: (node, value) => {
-          (node as Tone.Chorus).delayTime = value;
-        },
       },
       {
         input: 'Depth',
         description: 'How far the copies waver, 0–1.',
         fallback: 0.7,
-        apply: (node, value) => {
-          (node as Tone.Chorus).depth = Math.min(1, Math.max(0, value));
-        },
       },
     ],
-    needsStart: true,
   },
   {
     id: 'phaser',
@@ -171,8 +141,6 @@ const effectRows = [
     description:
       'A sweeping, swooshing effect made by moving notches up and down through the sound.',
     headerColor: '#155e75',
-    make: () =>
-      new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 350 }),
     signalParams: [
       wetParam,
       {
@@ -180,14 +148,12 @@ const effectRows = [
         description:
           'How fast the sweep moves, in sweeps per second (default 0.5).',
         fallback: 0.5,
-        target: (node) => (node as Tone.Phaser).frequency,
         modDomain: 'Hz',
       },
       {
         input: 'Q',
         description: 'How sharp and pronounced the notches are (default 10).',
         fallback: 10,
-        target: (node) => (node as Tone.Phaser).Q,
       },
     ],
     numberParams: [
@@ -195,17 +161,11 @@ const effectRows = [
         input: 'Octaves',
         description: 'How wide the sweep is, in octaves above Base Hz.',
         fallback: 3,
-        apply: (node, value) => {
-          (node as Tone.Phaser).octaves = Math.max(0, value);
-        },
       },
       {
         input: 'Base Hz',
         description: 'The lowest frequency the sweep reaches, in Hz.',
         fallback: 350,
-        apply: (node, value) => {
-          (node as Tone.Phaser).baseFrequency = value;
-        },
       },
     ],
   },
@@ -214,14 +174,12 @@ const effectRows = [
     name: 'Tremolo',
     description: 'Pulses the volume up and down in a steady rhythm.',
     headerColor: '#155e75',
-    make: () => new Tone.Tremolo({ frequency: 10, depth: 0.5 }),
     signalParams: [
       wetParam,
       {
         input: 'Rate Hz',
         description: 'Volume pulses per second (default 10).',
         fallback: 10,
-        target: (node) => (node as Tone.Tremolo).frequency,
         modDomain: 'Hz',
       },
       {
@@ -229,11 +187,9 @@ const effectRows = [
         description:
           'How deep the volume dips, 0 (not at all) to 1 (down to silence).',
         fallback: 0.5,
-        target: (node) => (node as Tone.Tremolo).depth,
       },
     ],
     numberParams: [],
-    needsStart: true,
   },
   {
     id: 'vibrato',
@@ -241,21 +197,18 @@ const effectRows = [
     description:
       'Wobbles the pitch up and down, like a singer’s or violinist’s vibrato.',
     headerColor: '#155e75',
-    make: () => new Tone.Vibrato({ frequency: 5, depth: 0.1 }),
     signalParams: [
       wetParam,
       {
         input: 'Rate Hz',
         description: 'Pitch wobbles per second (default 5).',
         fallback: 5,
-        target: (node) => (node as Tone.Vibrato).frequency,
         modDomain: 'Hz',
       },
       {
         input: 'Depth',
         description: 'How far the pitch wobbles, 0–1 (default 0.1).',
         fallback: 0.1,
-        target: (node) => (node as Tone.Vibrato).depth,
       },
     ],
     numberParams: [],
@@ -266,15 +219,12 @@ const effectRows = [
     description:
       'A filter that sweeps up and down by itself, for a rhythmic, wah-like movement.',
     headerColor: '#155e75',
-    make: () =>
-      new Tone.AutoFilter({ frequency: 1, baseFrequency: 200, octaves: 2.6 }),
     signalParams: [
       wetParam,
       {
         input: 'Rate Hz',
         description: 'Filter sweeps per second (default 1).',
         fallback: 1,
-        target: (node) => (node as Tone.AutoFilter).frequency,
         modDomain: 'Hz',
       },
     ],
@@ -283,20 +233,13 @@ const effectRows = [
         input: 'Base Hz',
         description: 'The lowest point of the sweep, in Hz.',
         fallback: 200,
-        apply: (node, value) => {
-          (node as Tone.AutoFilter).baseFrequency = value;
-        },
       },
       {
         input: 'Octaves',
         description: 'How far above Base Hz the sweep reaches, in octaves.',
         fallback: 2.6,
-        apply: (node, value) => {
-          (node as Tone.AutoFilter).octaves = Math.max(0, value);
-        },
       },
     ],
-    needsStart: true,
   },
   {
     id: 'autoWah',
@@ -304,34 +247,23 @@ const effectRows = [
     description:
       'A wah filter that opens as the sound gets louder, so the tone follows how hard you play.',
     headerColor: '#155e75',
-    make: () =>
-      new Tone.AutoWah({ baseFrequency: 100, octaves: 6, sensitivity: 0 }),
     signalParams: [wetParam],
     numberParams: [
       {
         input: 'Base Hz',
         description: 'Where the filter sits when the sound is quiet, in Hz.',
         fallback: 100,
-        apply: (node, value) => {
-          (node as Tone.AutoWah).baseFrequency = value;
-        },
       },
       {
         input: 'Octaves',
         description: 'How far above Base Hz the filter can open, in octaves.',
         fallback: 6,
-        apply: (node, value) => {
-          (node as Tone.AutoWah).octaves = Math.max(0, value);
-        },
       },
       {
         input: 'Sensitivity dB',
         description:
           'How easily it reacts. Lower values such as -30 let quieter sound open the wah (default 0).',
         fallback: 0,
-        apply: (node, value) => {
-          (node as Tone.AutoWah).sensitivity = value;
-        },
       },
     ],
   },
@@ -341,19 +273,16 @@ const effectRows = [
     description:
       'Moves the sound back and forth between the left and right speakers.',
     headerColor: '#155e75',
-    make: () => new Tone.AutoPanner({ frequency: 1 }),
     signalParams: [
       wetParam,
       {
         input: 'Rate Hz',
         description: 'Left-to-right sweeps per second (default 1).',
         fallback: 1,
-        target: (node) => (node as Tone.AutoPanner).frequency,
         modDomain: 'Hz',
       },
     ],
     numberParams: [],
-    needsStart: true,
   },
   {
     id: 'feedbackDelay',
@@ -361,14 +290,12 @@ const effectRows = [
     description:
       'Echo: repeats the sound after a set time, each repeat quieter than the last.',
     headerColor: '#3f6212',
-    make: () => new Tone.FeedbackDelay({ delayTime: 0.25, feedback: 0.4 }),
     signalParams: [
       wetParam,
       {
         input: 'Time s',
         description: 'Time between echoes, in seconds (default 0.25).',
         fallback: 0.25,
-        target: (node) => (node as Tone.FeedbackDelay).delayTime,
         modDomain: 's',
       },
       {
@@ -376,7 +303,6 @@ const effectRows = [
         description:
           'How much of each echo comes back as another, 0–1. Higher gives more repeats; near 1 they barely fade.',
         fallback: 0.4,
-        target: (node) => (node as Tone.FeedbackDelay).feedback,
       },
     ],
     numberParams: [],
@@ -387,14 +313,12 @@ const effectRows = [
     description:
       'Echo that bounces back and forth between the left and right speakers.',
     headerColor: '#3f6212',
-    make: () => new Tone.PingPongDelay({ delayTime: 0.25, feedback: 0.4 }),
     signalParams: [
       wetParam,
       {
         input: 'Time s',
         description: 'Time between echoes, in seconds (default 0.25).',
         fallback: 0.25,
-        target: (node) => (node as Tone.PingPongDelay).delayTime,
         modDomain: 's',
       },
       {
@@ -402,7 +326,6 @@ const effectRows = [
         description:
           'How much of each echo comes back as another, 0–1. Higher gives more repeats; near 1 they barely fade.',
         fallback: 0.4,
-        target: (node) => (node as Tone.PingPongDelay).feedback,
       },
     ],
     numberParams: [],
@@ -413,7 +336,6 @@ const effectRows = [
     description:
       'Puts the sound in a room or hall, adding space and distance. Its tail is shorter than Decay s suggests.',
     headerColor: '#3f6212',
-    make: () => new Tone.Reverb({ decay: 2.5, preDelay: 0.01 }),
     signalParams: [wetParam],
     numberParams: [
       /**
@@ -452,21 +374,14 @@ const effectRows = [
         description:
           'Length of the reverb it builds, in seconds. The tail you hear is shorter: 2.5 gives about 1.6 s.',
         fallback: 2.5,
-        apply: (node, value) => {
-          (node as Tone.Reverb).decay = Math.max(0.001, value);
-        },
       },
       {
         input: 'PreDelay s',
         description:
           'A short gap before the reverb starts, in seconds. It keeps the original sound clear.',
         fallback: 0.01,
-        apply: (node, value) => {
-          (node as Tone.Reverb).preDelay = Math.max(0, value);
-        },
       },
     ],
-    awaitReady: (node) => (node as Tone.Reverb).ready,
   },
   {
     id: 'freeverb',
@@ -474,14 +389,12 @@ const effectRows = [
     description:
       'A classic room reverb whose room size can change while it plays.',
     headerColor: '#3f6212',
-    make: () => new Tone.Freeverb({ roomSize: 0.7, dampening: 3000 }),
     signalParams: [
       wetParam,
       {
         input: 'Room Size',
         description: 'Size of the room, 0–1. Larger gives a longer tail.',
         fallback: 0.7,
-        target: (node) => (node as Tone.Freeverb).roomSize,
       },
     ],
     numberParams: [
@@ -490,9 +403,6 @@ const effectRows = [
         description:
           'Highs above about this frequency fade sooner in the tail. Lower sounds darker (default 3000).',
         fallback: 3000,
-        apply: (node, value) => {
-          (node as Tone.Freeverb).dampening = value;
-        },
       },
     ],
   },
@@ -502,14 +412,12 @@ const effectRows = [
     description:
       'A simple vintage digital reverb with a slightly metallic ring.',
     headerColor: '#3f6212',
-    make: () => new Tone.JCReverb({ roomSize: 0.5 }),
     signalParams: [
       wetParam,
       {
         input: 'Room Size',
         description: 'Size of the room, 0–1. Larger gives a longer tail.',
         fallback: 0.5,
-        target: (node) => (node as Tone.JCReverb).roomSize,
       },
     ],
     numberParams: [],
@@ -520,7 +428,6 @@ const effectRows = [
     description:
       'Moves every frequency by the same number of Hz. Unlike Pitch Shift this breaks the harmony, giving bell-like or robotic tones.',
     headerColor: '#86198f',
-    make: () => new Tone.FrequencyShifter({ frequency: 0 }),
     signalParams: [
       wetParam,
       {
@@ -528,7 +435,6 @@ const effectRows = [
         description:
           'How many Hz to add to every frequency. Negative values move everything down.',
         fallback: 0,
-        target: (node) => (node as Tone.FrequencyShifter).frequency,
         modDomain: 'Hz',
       },
     ],
@@ -540,7 +446,6 @@ const effectRows = [
     description:
       'Shifts pitch up or down in semitones without changing speed. With Feedback it stacks shifted copies, as in a shimmer reverb.',
     headerColor: '#86198f',
-    make: () => new Tone.PitchShift({ pitch: 0, windowSize: 0.1 }),
     signalParams: [
       wetParam,
       {
@@ -560,7 +465,6 @@ const effectRows = [
         description:
           'Sends the shifted sound round again to be shifted further, 0–1. Above about 0.7, add a lowpass after it.',
         fallback: 0,
-        target: (node: EffectNode) => (node as Tone.PitchShift).feedback,
       },
     ],
     numberParams: [
@@ -569,21 +473,12 @@ const effectRows = [
         description:
           'How far to shift, in semitones: 12 is an octave up, -12 an octave down.',
         fallback: 0,
-        apply: (node, value) => {
-          (node as Tone.PitchShift).pitch = value;
-        },
       },
       {
         input: 'Window s',
         description:
           'Length of the slices it works in, in seconds (0.01–0.5). 0.03–0.1 suits most sounds.',
         fallback: 0.1,
-        apply: (node, value) => {
-          (node as Tone.PitchShift).windowSize = Math.min(
-            0.5,
-            Math.max(0.01, value),
-          );
-        },
       },
     ],
   },
@@ -592,7 +487,6 @@ const effectRows = [
     name: 'Stereo Widener',
     description: 'Makes a stereo sound wider or narrower.',
     headerColor: '#86198f',
-    make: () => new Tone.StereoWidener({ width: 0.5 }),
     signalParams: [
       wetParam,
       {
@@ -600,7 +494,6 @@ const effectRows = [
         description:
           '0 is mono, 0.5 leaves the sound unchanged, 1 is as wide as it goes.',
         fallback: 0.5,
-        target: (node) => (node as Tone.StereoWidener).width,
       },
     ],
     numberParams: [],
@@ -609,5 +502,23 @@ const effectRows = [
 
 type EffectRowId = (typeof effectRows)[number]['id'];
 
+/** The row whose id is `Id` — lets `effectAudio.ts` type its bindings by the
+ *  exact socket names this table declares. */
+type EffectRowById<Id extends EffectRowId> = Extract<
+  (typeof effectRows)[number],
+  { id: Id }
+>;
+type EffectSignalInput<Id extends EffectRowId> =
+  EffectRowById<Id>['signalParams'][number]['input'];
+type EffectNumberInput<Id extends EffectRowId> =
+  EffectRowById<Id>['numberParams'][number]['input'];
+
 export { effectRows };
-export type { EffectNode, EffectRow, EffectRowId };
+export type {
+  EffectNumberInput,
+  EffectNumberParam,
+  EffectRow,
+  EffectRowId,
+  EffectSignalInput,
+  EffectSignalParam,
+};

@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { buildBean } from './blipRigs';
 import { Spring } from './spring';
+import { createRenderGate } from '../landing/renderGate';
 
 /**
  * Blip — the tutorial guide, a little musician who points with a
  * conductor's baton. The model comes from blipRigs; every motion here is
  * procedural (springs, a blink scheduler). Budget: one tiny canvas, 30 fps
- * cap, nothing rendered while hidden. Reduced motion never gets here — the
+ * cap, nothing rendered while the tab is hidden or the canvas is out of the
+ * screen's view (renderGate.ts). Reduced motion never gets here — the
  * SVG twin (BlipCharacter) stands in.
  */
 
@@ -160,22 +162,26 @@ function createBlip(canvas: HTMLCanvasElement): BlipScene {
     baton.rotation.z = (pointLeft ? -1 : 1) * (hold + talk * 0.25 * Math.sin(t * 14));
   };
 
-  // ── loop: 30 fps, only while visible ────────────────────────────────
+  // ── loop: 30 fps, only while the render gate is open ────────────────
   let frameHandle: number | null = null;
   let last = performance.now();
-  const start = last;
+  /** Blip's own clock (s): it stands still while Blip is not drawn, so he
+   *  carries on where he stopped — no jump. */
+  let elapsed = 0;
   const frame = () => {
     frameHandle = requestAnimationFrame(frame);
     const now = performance.now();
     if (now - last < 1000 / 31) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    pose((now - start) / 1000, dt);
+    elapsed += dt;
+    pose(elapsed, dt);
     renderer.render(scene, camera);
   };
   const run = () => {
-    if (frameHandle === null && !document.hidden) {
-      last = performance.now();
+    if (frameHandle === null) {
+      // The first frame back draws at once, with a normal step.
+      last = performance.now() - 1000 / 30;
       frameHandle = requestAnimationFrame(frame);
     }
   };
@@ -183,9 +189,8 @@ function createBlip(canvas: HTMLCanvasElement): BlipScene {
     if (frameHandle !== null) cancelAnimationFrame(frameHandle);
     frameHandle = null;
   };
-  const onVisibility = () => (document.hidden ? halt() : run());
-  document.addEventListener('visibilitychange', onVisibility);
-  run();
+  const gate = createRenderGate(canvas, (open) => (open ? run() : halt()));
+  if (gate.isOpen()) run();
 
   return {
     setMood(next) {
@@ -209,8 +214,8 @@ function createBlip(canvas: HTMLCanvasElement): BlipScene {
       if (frameHandle === null) renderer.render(scene, camera);
     },
     dispose() {
+      gate.dispose();
       halt();
-      document.removeEventListener('visibilitychange', onVisibility);
       scene.traverse((child) => {
         const mesh = child as THREE.Mesh;
         mesh.geometry?.dispose();

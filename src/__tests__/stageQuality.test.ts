@@ -44,13 +44,32 @@ describe('pickStageTier', () => {
     expect(pickStageTier({ ...desktop, gpu: 'Mali-G78 MP14' }).params.tier).toBe('low');
   });
 
-  it('steps an integrated GPU down once', () => {
+  it('keeps an integrated GPU at HIGH on an ordinary screen', () => {
+    // Deepak's Intel UHD, 1280×800 @1 (1.0 M px): 41–46 fps on HIGH.
     const guess = pickStageTier({ ...desktop, gpu: INTEL_UHD });
+    expect(guess.params.tier).toBe('high');
+    expect(pickStageTier({ ...desktop, gpu: 'AMD Radeon(TM) Graphics' }).params.tier).toBe('high');
+    // 1920×1080 @1 (2.1 M px) is still under the integrated bar.
+    expect(pickStageTier({ ...desktop, gpu: INTEL_UHD, screenWidth: 1920, screenHeight: 1080 }).params.tier).toBe('high');
+  });
+
+  it('steps an integrated GPU down once above ~2.5 M px', () => {
+    // Deepak's laptop panel: 1707×1067 @1.5 = 4.1 M px, 12.5 fps on HIGH.
+    const laptop = { ...desktop, gpu: INTEL_UHD, screenWidth: 1707, screenHeight: 1067, devicePixelRatio: 1.5 };
+    const guess = pickStageTier(laptop);
     expect(guess.params.tier).toBe('medium');
-    expect(guess.reasons).toEqual(['integrated GPU']);
-    expect(pickStageTier({ ...desktop, gpu: 'AMD Radeon(TM) Graphics' }).params.tier).toBe('medium');
+    expect(guess.reasons).toEqual(['4.1 M px on an integrated GPU']);
+    // The same screen on a discrete GPU stays HIGH (under 4.5 M).
+    expect(pickStageTier({ ...laptop, gpu: NVIDIA }).params.tier).toBe('high');
     // Intel's discrete Arc cards are not integrated.
-    expect(pickStageTier({ ...desktop, gpu: 'ANGLE (Intel, Intel(R) Arc(TM) A770 Graphics, D3D11)' }).params.tier).toBe('high');
+    expect(pickStageTier({ ...laptop, gpu: 'ANGLE (Intel, Intel(R) Arc(TM) A770 Graphics, D3D11)' }).params.tier).toBe('high');
+  });
+
+  it('never demotes an integrated GPU twice for one big screen', () => {
+    // 2560×1440 @2 = 14.7 M px: over both bars, still one step.
+    const guess = pickStageTier({ ...desktop, gpu: INTEL_UHD, screenWidth: 2560, screenHeight: 1440, devicePixelRatio: 2 });
+    expect(guess.params.tier).toBe('medium');
+    expect(guess.reasons).toHaveLength(1);
   });
 
   it('counts few cores OR little memory as one step, not two', () => {
@@ -81,7 +100,7 @@ describe('pickStageTier', () => {
   it('combines steps down to LOW and no further', () => {
     const guess = pickStageTier({ ...desktop, gpu: INTEL_UHD, cores: 4, screenWidth: 2560, screenHeight: 1440, devicePixelRatio: 2 });
     expect(guess.params.tier).toBe('low');
-    expect(guess.reasons).toHaveLength(3);
+    expect(guess.reasons).toEqual(['4 cores', '14.7 M px on an integrated GPU']);
   });
 
   it('obeys ?quality= and ignores a bad value', () => {

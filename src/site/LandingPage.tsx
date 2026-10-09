@@ -79,12 +79,9 @@ function StageHero({ reduced }: { reduced: boolean }) {
     const stage = createStageScene(canvas, { reducedMotion: reduced, idleMotion: 3 });
     const ro = new ResizeObserver(([e]) => stage.resize(e.contentRect.width, e.contentRect.height));
     ro.observe(box);
-    // Scrolled away, the stage stops drawing: the rest of the page gets the
-    // frame budget, and the stage's own quality ladder is not pushed down by
-    // what other sections cost.
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) stage.resume(); else stage.pause(); });
-    io.observe(box);
-    return () => { io.disconnect(); ro.disconnect(); stage.dispose(); };
+    // Scrolled away, the stage stops drawing on its own (its render gate,
+    // `landing/renderGate.ts`): nothing to do here.
+    return () => { ro.disconnect(); stage.dispose(); };
   }, [reduced]);
 
   // Steering ends with Escape, or as soon as the hero scrolls out of view.

@@ -37,6 +37,7 @@ import { createFlutter } from './scene-flutter';
 import { sceneQuality, createAdaptive } from './scene-quality';
 import { grassQuality } from './scene-grass';
 import { MOVE_T, MOVES, REST, leaningPose, lyingPose, movePose, type MoveId, type MoveSetup, type Pose } from './scene-guitar-moves';
+import { createRenderGate } from '../../renderGate';
 
 export type InstrumentScene = {
   resize(width: number, height: number): void;
@@ -694,8 +695,10 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     { enabled: !quality.guess.forced && !options.reducedMotion && !params.has('noadapt') },
   );
 
-  const start = performance.now();
-  let previous = start;
+  let previous = performance.now();
+  /** The scene's own clock (s): it advances only while frames are drawn, so
+   *  a scene stopped by its render gate carries on where it stopped. */
+  let elapsed = 0;
   const MIN_FRAME_MS = 1000 / 61;
   const frame = () => {
     const now = performance.now();
@@ -704,13 +707,27 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     // rate, not the leaves, motes and moves.
     const dt = Math.min(0.25, (now - previous) / 1000);
     previous = now;
+    elapsed += dt;
     adaptive.frame(now);
-    step((now - start) / 1000, dt);
+    step(elapsed, dt);
   };
   // Reduced motion: one still frame whenever something changes.
   const still = () => step(clock.t || 2.0, 0);
   rig.onStill(still);
-  if (!options.reducedMotion) renderer.setAnimationLoop(frame);
+  // The loop runs only while the render gate is open: tab visible and the
+  // canvas in the screen's view (src/landing/renderGate.ts; the debug
+  // `stop()` closes it as the owner). Reopening restarts the frame clock one
+  // frame back, so the scene carries on where it stopped.
+  let looping = false;
+  const syncLoop = () => {
+    const run = !options.reducedMotion && gate.isOpen();
+    if (run === looping) return;
+    looping = run;
+    if (run) previous = performance.now() - 1000 / 60;
+    renderer.setAnimationLoop(run ? frame : null);
+  };
+  const gate = createRenderGate(canvas, syncLoop);
+  syncLoop();
 
   return {
     resize(width, height) {
@@ -728,9 +745,8 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
         still();
         return;
       }
-      const now = performance.now();
-      step((now - start) / 1000, 0);
-      previous = now;
+      step(elapsed, 0);
+      previous = performance.now();
     },
     setLive(live) {
       // A new move on every Play — only from the sunny start (a Play during
@@ -779,6 +795,7 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     currentMove: () => `${MOVES.find((m) => m.id === move)?.label ?? move}${forcedMove ? '' : ' (random)'}`,
     quality: () => `${tier.tier}${adaptive.label()}`,
     dispose() {
+      gate.dispose();
       renderer.setAnimationLoop(null);
       rig.dispose();
       guitar.dispose();
@@ -793,7 +810,7 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     debug: {
       world,
       rig,
-      stop: () => renderer.setAnimationLoop(null),
+      stop: () => gate.setPaused(true),
       renderAt: (t, dt = 1 / 60) => step(t, dt),
       tour: (p) => rig.debugSet(p),
     },

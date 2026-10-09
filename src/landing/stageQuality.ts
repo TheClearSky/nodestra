@@ -15,11 +15,17 @@
  * Startup (`?quality=low|medium|high` forces a tier and turns the runtime
  * adaptation off, so a forced tier is what is measured):
  *  - WebGL renderer string: mobile GPUs (Mali, Adreno, PowerVR, Apple's
- *    mobile GPUs) → low; software (SwiftShader, llvmpipe) → low; integrated
- *    (Intel, AMD APU "Radeon(TM) Graphics", "Vega 8") → one step down;
+ *    mobile GPUs) → low; software (SwiftShader, llvmpipe) → low;
  *  - navigator.hardwareConcurrency ≤ 4 or navigator.deviceMemory ≤ 4 → one
  *    step down (one in total);
- *  - screen pixels × DPR² above ~4.5 M → one step down;
+ *  - pixel load (screen pixels × DPR²) → one step down above ~4.5 M, or
+ *    above ~2.5 M on an integrated GPU (Intel, AMD APU "Radeon(TM)
+ *    Graphics", "Vega 8"). An integrated GPU alone does NOT demote: the
+ *    budget is fill rate, so it only lowers the bar for a big screen.
+ *    Measured on Deepak's Intel UHD (old stage, HIGH): 1280×800 @1 (1.0 M)
+ *    41–46 fps → stays HIGH; 1707×1067 @1.5 (4.1 M) 12.5 fps → MEDIUM.
+ *    Never two steps for the screen: a big screen on an integrated GPU is
+ *    one step, like a big screen anywhere;
  *  - coarse pointer (phones, tablets) → at most medium.
  *
  * Runtime: a ladder of finer levels inside the tier (pixel-ratio scale →
@@ -80,6 +86,10 @@ type StageTierGuess = { params: StageTierParams; reasons: string[]; forced: bool
 const MOBILE_GPU = /mali|adreno|powervr|apple a\d|sgx|tegra|videocore/i;
 const SOFTWARE_GPU = /swiftshader|llvmpipe|softpipe|software|basic render/i;
 const INTEGRATED_GPU = /intel|radeon\(tm\) graphics|vega \d|uhd|iris/i;
+/** Pixel load over which the stage starts a tier lower (screen px × DPR²). */
+const PIXEL_LOAD = 4.5e6;
+/** The same on an integrated GPU. */
+const PIXEL_LOAD_INTEGRATED = 2.5e6;
 /** Intel's discrete cards ("Arc(TM) A770") — not the "Arc(TM) Graphics"
  *  integrated into Meteor Lake. */
 const DISCRETE_INTEL = /arc\(tm\) a\d/i;
@@ -105,10 +115,8 @@ function pickStageTier(signals: StageSignals): StageTierGuess {
   } else if (SOFTWARE_GPU.test(gpu)) {
     level = 0;
     reasons.push('software renderer');
-  } else if (INTEGRATED_GPU.test(gpu) && !DISCRETE_INTEL.test(gpu)) {
-    level -= 1;
-    reasons.push('integrated GPU');
   }
+  const integrated = level === 2 && INTEGRATED_GPU.test(gpu) && !DISCRETE_INTEL.test(gpu);
   const cores = signals.cores ?? 8;
   const memory = signals.memory ?? 8;
   if (cores <= 4 || memory <= 4) {
@@ -117,9 +125,9 @@ function pickStageTier(signals: StageSignals): StageTierGuess {
   }
   const dpr = Math.min(signals.devicePixelRatio || 1, 2);
   const pixels = signals.screenWidth * signals.screenHeight * dpr * dpr;
-  if (pixels > 4.5e6) {
+  if (pixels > (integrated ? PIXEL_LOAD_INTEGRATED : PIXEL_LOAD)) {
     level -= 1;
-    reasons.push(`${(pixels / 1e6).toFixed(1)} M px`);
+    reasons.push(`${(pixels / 1e6).toFixed(1)} M px${integrated ? ' on an integrated GPU' : ''}`);
   }
   if (signals.coarsePointer && level > 1) {
     level = 1;
