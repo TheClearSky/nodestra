@@ -25,10 +25,10 @@ function slot(share: number): Slot {
   return handle;
 }
 
-/** A fresh scheduler with a fixed budget (`?live=`). */
-async function scheduler(budget: number) {
+/** A fresh scheduler with a fixed budget (`?live=`), loaded into `win`. */
+async function scheduler(budget: number, win: Record<string, unknown> = {}) {
   vi.stubGlobal('location', { search: `?live=${budget}` });
-  vi.stubGlobal('window', {});
+  vi.stubGlobal('window', win);
   vi.resetModules();
   return import('../showcase/liveScheduler');
 }
@@ -87,13 +87,20 @@ describe('live showcase scheduler', () => {
 
   it('looks ahead only once the visitor has scrolled', async () => {
     const listeners: Array<() => void> = [];
-    const { requestLive } = await scheduler(2);
-    vi.stubGlobal('window', { addEventListener: (_type: string, listener: () => void) => listeners.push(listener) });
+    const { requestLive } = await scheduler(2, { addEventListener: (_type: string, listener: () => void) => listeners.push(listener) });
     const offScreen = slot(0);
     requestLive(offScreen);
     await settle(10_000);
     expect(offScreen.isLive).toBe(false);
     for (const listener of listeners) listener();
+    await settle();
+    expect(offScreen.isLive).toBe(true);
+  });
+
+  it('a page already scrolled when the scheduler loads counts as scrolled', async () => {
+    const { requestLive } = await scheduler(2, { scrollY: 900 });
+    const offScreen = slot(0);
+    requestLive(offScreen);
     await settle();
     expect(offScreen.isLive).toBe(true);
   });

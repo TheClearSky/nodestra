@@ -52,8 +52,12 @@ const MIN_LIVE_MS = 4000;
  */
 let scrolled = false;
 let scrollWatch = false;
+/** Watches for the first scroll — from the moment this module loads, never
+ *  lazily: a page scrolled before any slot asked for a place (a wheel, then
+ *  a jump to a section) would otherwise never count as scrolled, and slots
+ *  near but not on screen would wait for a scroll that already happened. */
 function watchFirstScroll() {
-  if (scrollWatch) return;
+  if (scrollWatch || typeof window === 'undefined') return;
   scrollWatch = true;
   window.addEventListener?.(
     'scroll',
@@ -63,6 +67,13 @@ function watchFirstScroll() {
     },
     { once: true, passive: true },
   );
+}
+watchFirstScroll();
+/** Scrolled already (also before this module loaded, e.g. a restored
+ *  position)? */
+function hasScrolled(): boolean {
+  if (!scrolled && (window.scrollY ?? 0) > 0) scrolled = true;
+  return scrolled;
 }
 
 const live = new Map<LiveSlotHandle, number>();
@@ -85,7 +96,7 @@ function tick() {
   if (waiting.size === 0) return;
   budget ??= liveBudget();
   watchFirstScroll();
-  const next = [...waiting].filter((slot) => scrolled || slot.priority() > 0).sort(byPriority)[0];
+  const next = [...waiting].filter((slot) => hasScrolled() || slot.priority() > 0).sort(byPriority)[0];
   if (!next) return;
   if (live.size >= budget) {
     const now = performance.now();
@@ -131,6 +142,20 @@ function releaseLive(slot: LiveSlotHandle) {
 /** Priorities changed (scrolling): a waiting slot may now outrank a live one. */
 function reprioritise() {
   schedule();
+}
+
+// `?debug-live`: the scheduler's state on `window.__liveScheduler` (devtools,
+// tests).
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug-live')) {
+  (window as unknown as Record<string, unknown>).__liveScheduler = {
+    state: () => ({
+      budget,
+      scrolled,
+      tickQueued,
+      live: [...live.keys()].map((slot) => slot.priority()),
+      waiting: [...waiting].map((slot) => slot.priority()),
+    }),
+  };
 }
 
 /** True on devices that get one live showcase at a time (phones, low-end):
