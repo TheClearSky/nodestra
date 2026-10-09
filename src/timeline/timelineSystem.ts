@@ -83,8 +83,20 @@ function ensureTimelineRuntime(): TimelineTransport {
   return runtime.transport;
 }
 
+/**
+ * Showcase only: after the open graph was recorded offline, the transport
+ * every reader sees (the timeline UI, the curve-node previews, Stop) becomes
+ * the recording's playback (`playbackTransport.ts`). The offline one it
+ * replaces is disposed — its context has finished rendering.
+ */
+function installPlaybackTransport(next: TimelineTransport): void {
+  runtime.transport?.dispose();
+  runtime.transport = next;
+}
+
 export {
   ensureTimelineRuntime,
+  installPlaybackTransport,
   getTimelineRegistry,
   getTimelineStore,
   getTimelineTransport,

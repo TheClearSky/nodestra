@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { NodestraMark } from '../components/NodestraMark';
-import type { GraphShowcaseId } from '../showcase/showcaseIds';
+import type { AppSceneId } from '../showcase/appScenes';
 
 /*
  * What the landing page says, and its shared pieces. Every claim is on the
@@ -23,23 +23,23 @@ const NAV = [
   { href: '#open-source', label: 'Open source' },
 ];
 
-/** A real screen of the app, shown LIVE on the landing page (`src/showcase/`):
- *  the graph editor on a demo graph, or the Welcome page with Blip. `crop`
+/** A real screen of the app, shown LIVE on the landing page: the whole app
+ *  running a scene in a showcase frame (`src/showcase/appScenes.ts`). `crop`
  *  zooms in on part of the 1440x900 desktop layout. */
 type Shot = {
   key: string;
-  showcase: { kind: 'graph'; id: GraphShowcaseId } | { kind: 'welcome' };
+  showcase: { kind: 'app'; scene: AppSceneId };
   title: string;
   caption: string;
   crop?: { x: number; y: number; scale: number };
 };
 const SCREENS: Shot[] = [
-  { key: 'effects', showcase: { kind: 'graph', id: 'effectsGraph' }, title: 'A running effects graph', caption: 'Every node is a real sound. Green wires carry the audio; each node draws its wave live.' },
-  { key: 'add-menu', showcase: { kind: 'graph', id: 'addMenu' }, title: 'The Add menu, Easy Effects', caption: 'Eight Easy Effects wait in the Add menu, from Stutter to Crunch.', crop: { x: 1000, y: 360, scale: 1.45 } },
-  { key: 'inside-group', showcase: { kind: 'graph', id: 'insideGroup' }, title: 'Inside the Echo group', caption: 'Open one up and see the nodes that make it.' },
-  { key: 'timeline', showcase: { kind: 'graph', id: 'timeline' }, title: 'The timeline, playing', caption: 'Draw curves that move any setting while it plays.' },
-  { key: 'grid-finder', showcase: { kind: 'graph', id: 'gridFinder' }, title: 'The grid finder', caption: 'It suggests tempos that fit your notes, and shows how many land on the grid.', crop: { x: 720, y: 450, scale: 1.25 } },
-  { key: 'welcome', showcase: { kind: 'welcome' }, title: 'Blip, on the Welcome page', caption: 'Blip, a small conductor, shows you what to click, step by step.', crop: { x: 1080, y: 720, scale: 1.6 } },
+  { key: 'effects', showcase: { kind: 'app', scene: 'effects' }, title: 'A running effects graph', caption: 'Every node is a real sound. Green wires carry the audio; each node draws its wave live.' },
+  { key: 'add-menu', showcase: { kind: 'app', scene: 'addMenu' }, title: 'The Add menu, Easy Effects', caption: 'Eight Easy Effects wait in the Add menu, from Stutter to Crunch.', crop: { x: 1000, y: 360, scale: 1.45 } },
+  { key: 'inside-group', showcase: { kind: 'app', scene: 'insideGroup' }, title: 'Inside the Echo group', caption: 'Open one up and see the nodes that make it.' },
+  { key: 'timeline', showcase: { kind: 'app', scene: 'timeline' }, title: 'The timeline, playing', caption: 'Draw curves that move any setting while it plays.' },
+  { key: 'grid-finder', showcase: { kind: 'app', scene: 'gridFinder' }, title: 'The grid finder', caption: 'It suggests tempos that fit your notes, and shows how many land on the grid.', crop: { x: 720, y: 450, scale: 1.25 } },
+  { key: 'welcome', showcase: { kind: 'app', scene: 'welcome' }, title: 'Blip, on the Welcome page', caption: 'Blip, a small conductor, shows you what to click, step by step.', crop: { x: 1080, y: 720, scale: 1.6 } },
 ];
 
 type Feature = { key: string; color: string; title: string; text: string };

@@ -127,6 +127,9 @@ function writeShowWelcome(value: boolean): void {
 import { useLibrarySession } from './library/useLibrarySession';
 import { allDemoCategories } from './soundDefinitions/demoCatalog';
 import { STORAGE_NAMESPACE } from './storageNamespace';
+import { isLiveShowcase, isShowcase } from './appEnvironment';
+import { registerSceneRecorder } from './showcase/recording';
+import { noteShowcaseRunEvent, recordOpenGraph } from './audio/showcaseRecording';
 
 // The landing stage pulls in three.js: its own chunk, fetched only while the
 // start gate is up. The plain gate below stands in until it arrives.
@@ -235,7 +238,8 @@ function App() {
   const [audioReady, setAudioReady] = useState(false);
   // The landing stage outlives the audio start: it flies into the piano,
   // fades to black and lifts the black off the app, then says so.
-  const [stageShown, setStageShown] = useState(true);
+  // A landing-page showcase (`appEnvironment`) starts in the app itself.
+  const [stageShown, setStageShown] = useState(() => !isShowcase());
   // While the stage fully covers the app, the app is not painted and its
   // live previews stop drawing — measured: ~20 hidden waveform painters plus
   // painting 11k hidden DOM nodes cost more than the stage's own WebGL
@@ -616,6 +620,21 @@ function App() {
     runner.run();
   }, []);
 
+  // A landing-page showcase cannot start audio (no click), so it RECORDS the
+  // open graph silently and plays that back into the previews and playhead
+  // (`audio/showcaseRecording.ts`). The frame asks once its scene is set up.
+  useEffect(() => {
+    if (!isShowcase()) return;
+    return registerSceneRecorder(async (options) => {
+      await recordOpenGraph({
+        startAt: options.startAt,
+        hasGraph: () => runnerRef.current !== null,
+        run: runGraphNow,
+        showTransport: setTimelineTransport,
+      });
+    });
+  }, [runGraphNow]);
+
   // Auto-run. Every graph change re-arms one timer; when it fires and the run
   // would actually change something, the graph runs. The countdown is a
   // separate, cheap interval so the button can show the wait without the timer
@@ -732,6 +751,27 @@ function App() {
     runGraphNow();
   }, [state, audioReady, runInFlight, runGraphNow]);
 
+  // "Try it" on the landing page (a live showcase): no start gate, so audio
+  // starts on the visitor's first click or key inside the app — a gesture in
+  // this window, which is what browsers require.
+  const handleStartRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    if (!isLiveShowcase()) return;
+    const start = (event: Event) => {
+      // The scene's own scripted clicks are not the visitor.
+      if (!event.isTrusted) return;
+      window.removeEventListener('pointerdown', start, true);
+      window.removeEventListener('keydown', start, true);
+      void handleStartRef.current();
+    };
+    window.addEventListener('pointerdown', start, true);
+    window.addEventListener('keydown', start, true);
+    return () => {
+      window.removeEventListener('pointerdown', start, true);
+      window.removeEventListener('keydown', start, true);
+    };
+  }, []);
+
   async function handleStart() {
     setStarting(true);
     setStartError(undefined);
@@ -749,6 +789,8 @@ function App() {
       setStarting(false);
     }
   }
+
+  handleStartRef.current = handleStart;
 
   return (
     <>
@@ -1068,6 +1110,7 @@ function App() {
             onRunEvent={(event: RunEvent) => {
               const pending = pendingRunSignaturesRef.current;
               runInFlightRef.current = event.kind === 'run:started';
+              if (isShowcase()) noteShowcaseRunEvent(event);
               switch (event.kind) {
                 case 'run:started':
                   // Snapshot HERE, not when the record arrives: the record

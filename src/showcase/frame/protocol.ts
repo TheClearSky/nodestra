@@ -7,14 +7,11 @@
 /** Frame → page. */
 type FrameToPage = { type: 'showcase:ready' } | { type: 'showcase:failed'; message: string };
 
-/** Page → frame. */
-type PageToFrame = { type: 'showcase:visible'; visible: boolean };
-
 /** What a frame shows — the query string of `showcase.html`. */
-type FrameQuery = { kind: 'graph'; id: string } | { kind: 'welcome' };
+type FrameQuery = { kind: 'app'; scene: string };
 
 function frameSearch(query: FrameQuery): string {
-  return query.kind === 'graph' ? `?kind=graph&id=${encodeURIComponent(query.id)}` : '?kind=welcome';
+  return `?kind=app&scene=${encodeURIComponent(query.scene)}`;
 }
 
 function isMessage<T extends { type: string }>(data: unknown, prefix = 'showcase:'): data is T {
@@ -22,4 +19,4 @@ function isMessage<T extends { type: string }>(data: unknown, prefix = 'showcase
 }
 
 export { frameSearch, isMessage };
-export type { FrameQuery, FrameToPage, PageToFrame };
+export type { FrameQuery, FrameToPage };

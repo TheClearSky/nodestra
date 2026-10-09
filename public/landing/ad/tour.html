@@ -285,26 +285,53 @@ const IMG = {
 };
 
 
-/* ---------- no-image variant: UI shots are the real app DOM (ui/*.html) ---------- */
-const UI_DOM = {
-  'shots/03-welcome-blip.png': 'ui/03-welcome-blip.html', 'shots/05-tutorial-2.png': 'ui/05-tutorial-2.html',
-  'shots/06-graph-effects.png': 'ui/06-graph-effects.html', 'shots/07-info.png': 'ui/07-info.html',
-  'shots/08-add-menu.png': 'ui/08-add-menu.html', 'shots/09-inside-group.png': 'ui/09-inside-group.html',
-  'shots/10-group-editor.png': 'ui/10-group-editor.html', 'shots/11-timeline.png': 'ui/11-timeline.html',
-  'shots/12-grid-finder.png': 'ui/12-grid-finder.html', 'shots/13-violin.png': 'ui/13-violin.html'
+/* ---------- the app screens are the REAL app, live (showcase frames) ----------
+ * Each screen is the Nodestra app itself, running one scene in a showcase frame
+ * (`showcase.html?kind=app&scene=…`, `src/showcase/appScenes.ts`): storage
+ * isolated, set up through the app's own UI, previews and playhead playing a
+ * silent recording. A frame is mounted only around its time on screen (LIVE_LEAD
+ * seconds ahead, freed after) — never all ten at once — and the clock waits for
+ * a screen that is not ready yet, the way a video buffers. */
+const LIVE_SCENES = {
+  'shots/03-welcome-blip.png': 'welcome', 'shots/05-tutorial-2.png': 'tutorial',
+  'shots/06-graph-effects.png': 'effects', 'shots/07-info.png': 'info',
+  'shots/08-add-menu.png': 'addMenu', 'shots/09-inside-group.png': 'insideGroup',
+  'shots/10-group-editor.png': 'groupEditor', 'shots/11-timeline.png': 'timeline',
+  'shots/12-grid-finder.png': 'gridFinder', 'shots/13-violin.png': 'violin'
 };
+const SHOWCASE = '../../showcase.html';
+const LIVE_LEAD = 10, LIVE_TAIL = 1;
+const liveFrames = new Map(); // iframe -> { scene, mounted, ready }
+addEventListener('message', (e) => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'showcase:ready') return;
+  for (const [f, lf] of liveFrames) if (f.contentWindow === e.source) { lf.ready = true; dirty = true; }
+});
 const uiLoads = [];
 function shotEl(src, cls) {
   if (src === IMG.s01) return liveHost('s01');
   if (src === IMG.s02) return liveHost('s02');
-  const dom = UI_DOM[src];
-  if (!dom) { const im = document.createElement('img'); im.alt = ''; im.draggable = false; im.decoding = 'async'; im.src = src; if (cls) im.className = cls; return im; }
+  const scene = LIVE_SCENES[src];
+  if (!scene) { const im = document.createElement('img'); im.alt = ''; im.draggable = false; im.decoding = 'async'; im.src = src; if (cls) im.className = cls; return im; }
   const f = document.createElement('iframe');
-  f.src = dom; f.width = 1440; f.height = 900; f.tabIndex = -1;
+  f.width = 1440; f.height = 900; f.tabIndex = -1;
   f.setAttribute('scrolling', 'no'); f.setAttribute('aria-hidden', 'true'); f.setAttribute('title', '');
   if (cls) f.className = cls;
-  uiLoads.push(new Promise((res) => f.addEventListener('load', res, { once: true })));
+  liveFrames.set(f, { scene, mounted: false, ready: false });
   return f;
+}
+/** Mounts the frames whose screens are near `t`, frees the rest; true while a
+ *  screen about to show (or showing) is not ready — the clock then waits. */
+function liveFramesAt(t) {
+  let waiting = false;
+  for (const sg of SEGS) {
+    const f = sg.el.querySelector('iframe'), lf = f && liveFrames.get(f);
+    if (!lf) continue;
+    const near = t >= sg.t0 - LIVE_LEAD && t <= sg.t1 + LIVE_TAIL;
+    if (near && !lf.mounted) { lf.mounted = true; lf.ready = false; f.src = `${SHOWCASE}?kind=app&scene=${lf.scene}`; }
+    else if (!near && lf.mounted) { lf.mounted = false; lf.ready = false; f.src = 'about:blank'; }
+    if (lf.mounted && !lf.ready && t >= sg.t0 - 0.25 && t <= sg.t1) waiting = true;
+  }
+  return waiting;
 }
 
 /* ---------- live stage: one WebGL canvas shared by the 01 / 02 panels ---------- */
@@ -593,7 +620,7 @@ function box(o) {
   fx(o.t0, o.t1, (t) => {
     const p = o.seg.cur, e = env(t, o.t0, o.t1, 0.35, 0.4) * p.o;
     if (e <= 0.01) return;
-    const pad = o.pad ?? 4, [u0, v0, u1, v1] = o.rect;
+    const pad = o.pad ?? 4, [u0, v0, u1, v1] = typeof o.rect === 'function' ? o.rect() : o.rect;
     const q = [proj(p, u0 - pad, v0 - pad), proj(p, u1 + pad, v0 - pad), proj(p, u1 + pad, v1 + pad), proj(p, u0 - pad, v1 + pad)];
     const k = EZ.o(clamp((t - o.t0) / 0.6));
     strokePoly(q, o.col, 9, e * 0.16, k);
@@ -607,7 +634,8 @@ function ring(o) {
   fx(o.t0, o.t1, (t) => {
     const p = o.seg.cur, e = env(t, o.t0, o.t1, 0.3, 0.4) * p.o;
     if (e <= 0.01) return;
-    const P = proj(p, o.u, o.v), R = o.r * p.s * P[2], pu = 0.5 + 0.5 * Math.sin((t - o.t0) * 5);
+    const u = typeof o.u === 'function' ? o.u() : o.u;
+    const P = proj(p, u, o.v), R = o.r * p.s * P[2], pu = 0.5 + 0.5 * Math.sin((t - o.t0) * 5);
     dot(P[0], P[1], R * 2.6, o.col, e * 0.35, true);
     ctx.globalAlpha = e * (0.55 + 0.35 * pu); ctx.strokeStyle = o.col; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(P[0], P[1], R * (1 + 0.14 * pu), 0, 6.2832); ctx.stroke();
@@ -846,8 +874,16 @@ flow({ seg: s11, t0: EXPT + EXPD, t1: T('grid', 1.25), gap: 6, speed: 120, size:
   paths: [{ pts: CURVE, col: COL.lime },
     Object.assign(wire([421, 214], [536, 356]), { col: COL.signal }), Object.assign(wire([421, 300], [538, 356]), { col: COL.signal }),
     Object.assign(wire([577, 425], [623, 456]), { col: COL.audio })] });
-box({ seg: s11, rect: [788, 690, 790, 900], col: COL.amber, pad: 1, t0: T('curves', 1.8), t1: T('grid', 0.6) });
-ring({ seg: s11, u: 789, v: 814, r: 8, col: COL.lime, t0: T('curves', 1.9), t1: T('grid', 0.6) });
+// The playhead moves (the scene plays its recording): its highlight follows
+// the live playhead in the frame, falling back to where the snapshot had it.
+const playheadU = () => {
+  const d = s11.el.querySelector('iframe')?.contentDocument;
+  const ph = d?.querySelector('[class~="rbnt:border-tl-accent"][class~="rbnt:w-0"]');
+  const x = ph ? ph.getBoundingClientRect().x : NaN;
+  return Number.isFinite(x) && x > 0 ? x : 789;
+};
+box({ seg: s11, rect: () => { const u = playheadU(); return [u - 1, 690, u + 1, 900]; }, col: COL.amber, pad: 1, t0: T('curves', 1.8), t1: T('grid', 0.6) });
+ring({ seg: s11, u: playheadU, v: 814, r: 8, col: COL.lime, t0: T('curves', 1.9), t1: T('grid', 0.6) });
 box({ seg: s11, rect: [677, 594, 857, 612], col: COL.silver, t0: T('curves', 2.5), t1: T('grid', 0.5), ph: 0.4 });
 
 /* S9 — the grid finder (12): opened from "find grid"; the top suggestion and its on-grid hits glow. */
@@ -1093,6 +1129,7 @@ const HK9 = { ready: false };
 function hookInside() {
   const f = s09.el.querySelector('iframe'), d = f && f.contentDocument;
   if (!d || !d.querySelector('.react-flow__node')) return false;
+  HK9.doc = d;
   const pos = (n) => { const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(n.style.transform || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
   HK9.nodes = [...d.querySelectorAll('.react-flow__node')].sort((a, b) => pos(a)[0] - pos(b)[0] || pos(a)[1] - pos(b)[1]);
   HK9.edges = [];
@@ -1111,6 +1148,8 @@ function hookInside() {
 }
 const sv = (el, k, v) => { if (el['__' + k] !== v) { el['__' + k] = v; el.style[k] = v; } };
 function insideSync(t) {
+  const fd = s09.el.querySelector('iframe')?.contentDocument;
+  if (HK9.ready && HK9.doc !== fd) HK9.ready = false; // the frame was remounted
   if (!HK9.ready && !hookInside()) return;
   const TL = T('inside', 1.35);
   const active = !reduced && t >= T('inside', 0) && t < T('path', 1.8);
@@ -1218,7 +1257,8 @@ function frame(ts) {
   raf = requestAnimationFrame(frame);
   if (last === null) last = ts;
   const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-  if (playing) { t += dt; if (t >= TOTAL) t -= TOTAL; dirty = true; }
+  const buffering = liveFramesAt(t);
+  if (playing && !buffering) { t += dt; if (t >= TOTAL) t -= TOTAL; dirty = true; }
   if (dirty) { render(t); dirty = false; }
 }
 function run() { if (!raf && started && !document.hidden) { last = null; raf = requestAnimationFrame(frame); } }

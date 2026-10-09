@@ -14,11 +14,15 @@
 
 import * as Tone from 'tone';
 import { getCurrentBuildId } from '../../soundDefinitions/audioSystem';
+import { isRecordedAnalyser } from './recordedFrames';
+import type { RecordedAnalyser } from './recordedFrames';
 
 type TapMode = 'wave' | 'audiogram' | 'meter' | 'signal';
 
 type Tap = {
-  analyser: Tone.Waveform | Tone.FFT | Tone.Meter;
+  /** A live Tone analyser — or, in a showcase, its recording (same
+   *  `getValue()` shape; see `recordedFrames.ts`). */
+  analyser: Tone.Waveform | Tone.FFT | Tone.Meter | RecordedAnalyser;
   mode: TapMode;
   buildId: number;
   source: unknown;
@@ -49,7 +53,7 @@ function setPreviewMode(nodeId: string, mode: TapMode): void {
   }
 }
 
-function makeAnalyser(mode: TapMode): Tap['analyser'] {
+function makeAnalyser(mode: TapMode): Tone.Waveform | Tone.FFT | Tone.Meter {
   switch (mode) {
     case 'wave':
       return new Tone.Waveform(1024);
@@ -66,7 +70,8 @@ function makeAnalyser(mode: TapMode): Tap['analyser'] {
 }
 
 function disposeTap(tap: Tap): void {
-  if (tap.buildId === getCurrentBuildId()) {
+  // A recording was never connected to anything.
+  if (tap.buildId === getCurrentBuildId() && !isRecordedAnalyser(tap.analyser)) {
     try {
       Tone.disconnect(
         tap.source as ToneConnectSource,
@@ -131,6 +136,27 @@ function acquireTap(
   const tap: Tap = { analyser, mode, buildId: chain.buildId, source: chain.output };
   taps.set(nodeId, tap);
   return tap;
+}
+
+/** Showcase recording: every tap that is live right now (one per mounted
+ *  preview of the current build). */
+function getLiveTaps(): ReadonlyMap<string, Tap> {
+  const current = getCurrentBuildId();
+  return new Map([...taps].filter(([, tap]) => tap.buildId === current));
+}
+
+/**
+ * Showcase recording: swap a tap's analyser for its recording. The tap keeps
+ * its identity (mode, build, source), so `acquireTap` goes on returning it and
+ * the painters read the recording exactly as they read the analyser. The live
+ * analyser is disconnected and disposed here, like any replaced tap.
+ */
+function replaceTapAnalyser(nodeId: string, analyser: RecordedAnalyser): boolean {
+  const tap = taps.get(nodeId);
+  if (!tap || tap.buildId !== getCurrentBuildId()) return false;
+  disposeTap(tap);
+  tap.analyser = analyser;
+  return true;
 }
 
 function releaseTap(nodeId: string): void {
@@ -212,6 +238,8 @@ function getTapFftBins(nodeId: string): number[] | null {
 export {
   acquireTap,
   arePreviewsPaused,
+  getLiveTaps,
+  replaceTapAnalyser,
   setPreviewsPaused,
   getPreviewMode,
   getTapFftBins,

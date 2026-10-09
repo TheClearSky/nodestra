@@ -128,8 +128,7 @@ type TutorialLayerProps = {
   onOfferDismiss(): void;
 };
 
-/** Blip's first-run offer: show the piano tutorial, or just open the demo.
- *  Also shown, live, on the landing page (`showcase/WelcomeShowcase`). */
+/** Blip's first-run offer: show the piano tutorial, or just open the demo. */
 function BlipOffer({ onTutorial, onJustOpen, onDismiss }: { onTutorial(): void; onJustOpen(): void; onDismiss(): void }) {
   return (
     <Dock

@@ -29,8 +29,9 @@ function liveBudget(): number {
   const coarse = window.matchMedia('(pointer: coarse)').matches;
   const cores = nav.hardwareConcurrency ?? 8;
   const memory = nav.deviceMemory ?? 8;
-  if (cores <= 4 || memory <= 4) return 1;
-  if (coarse) return 2;
+  // Phones and tablets: one at a time. Each showcase is the whole app; on an
+  // emulated phone (CPU /4) two live cards ran the page at 13 fps, one at 22.
+  if (cores <= 4 || memory <= 4 || coarse) return 1;
   return 3;
 }
 

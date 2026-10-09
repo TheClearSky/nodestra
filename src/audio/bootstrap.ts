@@ -21,14 +21,16 @@ type PersistentBus = {
   meter: Tone.Meter;
   monitor: Tone.Gain;
   pitch: Tone.Signal<'frequency'>;
-  recorder: Tone.Recorder;
+  /** Absent on an offline (showcase) context: MediaRecorder needs a live
+   *  stream, which an OfflineAudioContext cannot make. */
+  recorder?: Tone.Recorder;
 };
 
 let persistent: PersistentBus | undefined;
 let startPromise: Promise<void> | undefined;
 const contextStateListeners = new Set<(state: string) => void>();
 
-function buildPersistentBus(): void {
+function buildPersistentBus({ withRecorder }: { withRecorder: boolean }): void {
   const master = new Tone.Volume(-6);
   // 0.6: smooth enough for humans, fast enough that 2 Hz modulation
   // remains measurable through the per-getValue smoothing.
@@ -43,8 +45,11 @@ function buildPersistentBus(): void {
   });
   // Recorder taps the master BEFORE the monitor stage: recordings capture
   // the mix even while the speakers are muted.
-  const recorder = new Tone.Recorder();
-  Tone.connect(master, recorder);
+  let recorder: Tone.Recorder | undefined;
+  if (withRecorder) {
+    recorder = new Tone.Recorder();
+    Tone.connect(master, recorder);
+  }
   persistent = { master, meter, monitor, pitch, recorder };
   if (urlFlag('muted')) {
     setMonitorMuted(true);
@@ -74,43 +79,8 @@ function startAudio(): Promise<void> {
   if (startPromise) return startPromise;
   const attempt = (async () => {
     await Tone.start();
-    // Register the gate-mode worklets ONCE per context.
-    // The generated public/*.worklet.js artifacts are served identically
-    // by dev and build; a failure here must not brick basic
-    // audio — gate-mode impls throw their own clear error if the
-    // processors are missing.
-    if (!workletsRegistered) {
-      try {
-        // NOT Tone's Context.addAudioWorkletModule: tone@15 caches the
-        // FIRST call's promise and silently ignores every later URL
-        // (Context.js `if (!this._workletPromise)`) — the second module
-        // would never register (empty-message NotSupportedError from
-        // createAudioWorkletNode). Go straight to the raw context's
-        // audioWorklet.
-        const audioWorklet = (
-          Tone.getContext().rawContext as unknown as {
-            audioWorklet?: { addModule(url: string): Promise<void> };
-          }
-        ).audioWorklet;
-        if (!audioWorklet) throw new Error('audioWorklet unavailable');
-        // PER-MODULE, not all-or-nothing: a single bad module used to take
-        // down `sound-envelope` too, and every generated instrument contains
-        // a gate-mode adsr — so one broken string worklet would silence the
-        // whole instrument library with nothing but a console error.
-        for (const [name, url] of WORKLET_MODULES) {
-          try {
-            await audioWorklet.addModule(url);
-            registeredProcessors.add(name);
-          } catch (moduleError) {
-            console.error('[audio] worklet failed', url, moduleError);
-          }
-        }
-        workletsRegistered = registeredProcessors.size > 0;
-      } catch (error) {
-        console.error('[audio] worklet registration failed', error);
-      }
-    }
-    if (!persistent) buildPersistentBus();
+    await registerWorklets();
+    if (!persistent) buildPersistentBus({ withRecorder: true });
   })();
   startPromise = attempt.finally(() => {
     startPromise = undefined;
@@ -118,7 +88,77 @@ function startAudio(): Promise<void> {
   return startPromise;
 }
 
+/**
+ * Showcase only (`appEnvironment`): "start audio" on an OfflineAudioContext
+ * instead of the speakers — no user gesture needed. The SAME worklets and
+ * persistent bus as `startAudio`, so a graph built afterwards takes the very
+ * path a real run takes; the caller renders the context (see
+ * `showcaseRecording.ts`). One per page: the bus is built once.
+ */
+async function startOfflineAudio(
+  durationSeconds: number,
+): Promise<Tone.OfflineContext> {
+  if (persistent) throw new Error('Audio already started');
+  const context = new Tone.OfflineContext(2, durationSeconds, offlineSampleRate());
+  Tone.setContext(context);
+  await registerWorklets();
+  buildPersistentBus({ withRecorder: false });
+  return context;
+}
+
+/** The rate a live start would run at on this device — Tone's default
+ *  (not yet started) context reports it — so a 1024-sample analyser window
+ *  spans what it spans live. Capped at 48 kHz: a 96 kHz interface would
+ *  double the render's cost for no visible difference. */
+const MAX_OFFLINE_SAMPLE_RATE = 48000;
+function offlineSampleRate(): number {
+  const deviceRate = Tone.getContext().sampleRate;
+  return Number.isFinite(deviceRate) && deviceRate >= 22050
+    ? Math.min(deviceRate, MAX_OFFLINE_SAMPLE_RATE)
+    : 44100;
+}
+
 let workletsRegistered = false;
+
+/** Register every worklet module on Tone's CURRENT context, once. */
+async function registerWorklets(): Promise<void> {
+  // Register the gate-mode worklets ONCE per context.
+  // The generated public/*.worklet.js artifacts are served identically
+  // by dev and build; a failure here must not brick basic
+  // audio — gate-mode impls throw their own clear error if the
+  // processors are missing.
+  if (!workletsRegistered) {
+    try {
+      // NOT Tone's Context.addAudioWorkletModule: tone@15 caches the
+      // FIRST call's promise and silently ignores every later URL
+      // (Context.js `if (!this._workletPromise)`) — the second module
+      // would never register (empty-message NotSupportedError from
+      // createAudioWorkletNode). Go straight to the raw context's
+      // audioWorklet.
+      const audioWorklet = (
+        Tone.getContext().rawContext as unknown as {
+          audioWorklet?: { addModule(url: string): Promise<void> };
+        }
+      ).audioWorklet;
+      if (!audioWorklet) throw new Error('audioWorklet unavailable');
+      // PER-MODULE, not all-or-nothing: a single bad module used to take
+      // down `sound-envelope` too, and every generated instrument contains
+      // a gate-mode adsr — so one broken string worklet would silence the
+      // whole instrument library with nothing but a console error.
+      for (const [name, url] of WORKLET_MODULES) {
+        try {
+          await audioWorklet.addModule(url);
+          registeredProcessors.add(name);
+        } catch (moduleError) {
+          console.error('[audio] worklet failed', url, moduleError);
+        }
+      }
+      workletsRegistered = registeredProcessors.size > 0;
+    } catch (error) {
+      console.error('[audio] worklet registration failed', error);
+    }
+  }
+}
 
 /** Processor name → the generated module that registers it (under the
  *  site's base path — a sub-path on GitHub Pages). */
@@ -240,7 +280,7 @@ function isRecording(): boolean {
 }
 
 function startRecording(): void {
-  if (!persistent || recording) return;
+  if (!persistent?.recorder || recording) return;
   recording = true;
   persistent.recorder.start();
 }
@@ -249,7 +289,7 @@ function startRecording(): void {
  *  The flag flips only AFTER the recorder settles so a rapid
  *  re-click cannot start() a MediaRecorder that is still stopping. */
 async function stopRecording(): Promise<Blob | undefined> {
-  if (!persistent || !recording) return undefined;
+  if (!persistent?.recorder || !recording) return undefined;
   try {
     const blob = await persistent.recorder.stop();
     lastRecordingBytes = blob.size;
@@ -329,6 +369,7 @@ export {
   setMonitorMuted,
   setPitchGlide,
   startAudio,
+  startOfflineAudio,
   startRecording,
   stopRecording,
   urlFlag,

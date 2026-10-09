@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { LiveComponentProps } from './LiveSlot';
 import { frameSearch, isMessage } from './frame/protocol';
-import type { FrameQuery, FrameToPage, PageToFrame } from './frame/protocol';
+import type { FrameQuery, FrameToPage } from './frame/protocol';
 
 /**
  * A live showcase in its own window: an iframe of `showcase.html`, which runs
@@ -9,7 +9,7 @@ import type { FrameQuery, FrameToPage, PageToFrame } from './frame/protocol';
  * In a slot it is laid out at the slot's desktop size and scaled; in the
  * "Try it" dialog it fills the dialog and takes input.
  */
-function FrameLive({ query, visible, interactive, onReady }: { query: FrameQuery } & LiveComponentProps) {
+function FrameLive({ query, interactive, onReady }: { query: FrameQuery } & LiveComponentProps) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const readyRef = useRef(onReady);
   readyRef.current = onReady;
@@ -29,15 +29,11 @@ function FrameLive({ query, visible, interactive, onReady }: { query: FrameQuery
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  useEffect(() => {
-    const message: PageToFrame = { type: 'showcase:visible', visible };
-    frameRef.current?.contentWindow?.postMessage(message, location.origin);
-  }, [visible]);
-
   // The slot's error boundary turns this into its poster.
   if (failure !== null) throw new Error(`[showcase] the frame failed: ${failure}`);
 
-  const src = `${import.meta.env.BASE_URL}showcase.html${frameSearch(query)}${interactive ? '&interactive' : ''}`;
+  // "Try it" is the app in use: real audio on the visitor's first click.
+  const src = `${import.meta.env.BASE_URL}showcase.html${frameSearch(query)}${interactive ? '&live' : ''}`;
   return (
     <iframe
       ref={frameRef}

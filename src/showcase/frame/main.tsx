@@ -1,54 +1,69 @@
-import { Component, lazy, StrictMode, Suspense, useEffect, useState } from 'react';
+// FIRST: this window's storage is replaced before any app module runs.
+import './isolateStorage';
+import { Component, lazy, StrictMode, Suspense, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../../index.css';
-import type { GraphShowcaseId } from '../showcaseIds';
-import { isMessage } from './protocol';
-import type { FrameToPage, PageToFrame } from './protocol';
+import { setAppEnvironment } from '../../appEnvironment';
+import { APP_SCENE_IDS, appScenes, sceneRecording } from '../appScenes';
+import type { AppSceneId } from '../appScenes';
+import { recordScene } from '../recording';
+import { runSteps } from '../showcaseScript';
+import type { FrameToPage } from './protocol';
 
 /*
- * `showcase.html`: ONE live app component in its own window, for a landing
- * page slot. Its own window is the point — the editor's dialogs, menus and
- * popovers (Radix portals to document.body), its fixed-position pieces and
- * its keyboard handling all behave exactly as in the app, inside a real
- * 1440x900 viewport the page scales, and none of it can reach the landing
- * page.
+ * `showcase.html?kind=app&scene=<id>`: the REAL app, running one scene, in its
+ * own window — for the landing page's cards and tour. Its own window is the
+ * point: the app's dialogs, menus and popovers (Radix portals to
+ * document.body), its fixed-position pieces and its keyboard handling all
+ * behave exactly as in the app, inside a real 1440x900 viewport the page
+ * scales, and none of it can reach the landing page. Storage is isolated
+ * (`isolateStorage`), the scene is set up through the app's own UI
+ * (`appScenes`), and its previews play a silent recording (`recording`).
+ * Its 3D scenes stop drawing on their own while off screen (render gate).
  */
 
-// Only the kind this frame shows is loaded: the Welcome showcase brings
-// Blip's voice (Tone.js), which a graph frame must not pay for.
-const GraphShowcase = lazy(() => import('../GraphShowcase').then((module) => ({ default: module.GraphShowcase })));
-const WelcomeShowcase = lazy(() => import('../WelcomeShowcase').then((module) => ({ default: module.WelcomeShowcase })));
-const GRAPH_IDS: readonly string[] = ['effectsGraph', 'addMenu', 'insideGroup', 'timeline', 'gridFinder'] satisfies readonly GraphShowcaseId[];
+const App = lazy(() => import('../../App').then((module) => ({ default: module.App })));
 
 const params = new URLSearchParams(location.search);
 const kind = params.get('kind');
-const graphId = params.get('id') as GraphShowcaseId | null;
+const live = params.has('live');
+
+/** The real App, set up as `scene` through its own UI, then reported ready. */
+function AppScene({ scene, onReady }: { scene: AppSceneId; onReady(): void }) {
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
+  useEffect(() => {
+    let cancelled = false;
+    void runSteps(appScenes[scene], { root: document.body }, () => cancelled)
+      .catch((error: unknown) => console.warn('[showcase] a scene step failed', scene, error))
+      // The previews and playhead play a silent recording (no click needed) —
+      // except in "Try it", where the visitor's own click starts real audio.
+      .then(() => (cancelled || live ? undefined : recordScene(sceneRecording[scene])))
+      .catch((error: unknown) => console.warn('[showcase] recording the scene failed', scene, error))
+      .finally(() => {
+        if (!cancelled) requestAnimationFrame(() => requestAnimationFrame(() => readyRef.current()));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scene]);
+  return <App />;
+}
 
 function send(message: FrameToPage) {
   if (window.parent !== window) window.parent.postMessage(message, location.origin);
 }
 
 function Frame() {
-  const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== location.origin || event.source !== window.parent) return;
-      if (!isMessage<PageToFrame>(event.data)) return;
-      if (event.data.type === 'showcase:visible') setVisible(event.data.visible);
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, []);
-  const onReady = () => send({ type: 'showcase:ready' });
-  // A frame opened on its own (not in a slot) is the full-size "Try it" one.
-  const interactive = params.has('interactive') || window.parent === window;
-
-  if (kind === 'graph' && graphId !== null && GRAPH_IDS.includes(graphId)) {
-    return <GraphShowcase showcase={graphId} visible={visible} interactive={interactive} onReady={onReady} />;
-  }
-  if (kind === 'welcome') {
-    return <WelcomeShowcase visible={visible} interactive={interactive} onReady={onReady} />;
+  const onReady = () => {
+    // Also on the window, for a frame opened on its own (tests, devtools).
+    (window as unknown as { __showcaseReady?: boolean }).__showcaseReady = true;
+    send({ type: 'showcase:ready' });
+  };
+  const scene = params.get('scene') as AppSceneId | null;
+  if (kind === 'app' && scene !== null && APP_SCENE_IDS.includes(scene)) {
+    return <AppScene scene={scene} onReady={onReady} />;
   }
   send({ type: 'showcase:failed', message: `unknown showcase ${location.search}` });
   return null;
@@ -69,6 +84,9 @@ class FrameBoundary extends Component<{ children: ReactNode }, { failed: boolean
     return this.state.failed ? null : this.props.children;
   }
 }
+
+// The real App runs here as a showcase: no start stage (see appEnvironment).
+if (kind === 'app') setAppEnvironment({ kind: 'showcase', audio: live ? 'live' : 'recorded' });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

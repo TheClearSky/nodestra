@@ -37,11 +37,9 @@ verification/
 RESEARCH.md
 research/
 
-# Local-only sync tools: they copy the landing tour and the meadow scenes in
-# from the authoring sources under .claude/ (not in the repo), so they cannot
-# run from a clone. Their OUTPUT (public/landing/, src/landing/meadow/) is the
-# product and is committed.
-scripts/sync-landing-ad.mjs
+# Local-only sync tool: it copies the meadow scenes in from the authoring
+# sources under .claude/ (not in the repo), so it cannot run from a clone. Its
+# OUTPUT (src/landing/meadow/) is the product and is committed.
 scripts/sync-meadow.mjs
 .pytest_cache/
 __pycache__/

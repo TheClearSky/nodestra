@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/build-worklets.mjs && tsc --noEmit && vite build",
+    "build": "node scripts/build-worklets.mjs && node scripts/build-tour-stage.mjs && tsc --noEmit && vite build",
     "build:worklets": "node scripts/build-worklets.mjs",
     "type-check": "tsc --noEmit",
     "test:unit": "vitest run",
