@@ -6,7 +6,8 @@
  *   npm run record-tour                  the whole loop, 60 fps
  *   npm run record-tour -- --seconds 5   a quick look at the first 5 s
  *   npm run record-tour -- --fps 30
- *   npm run record-tour -- --poster-at 21   which moment is the poster
+ *   npm run record-tour -- --poster-at 40   which moment is the poster (default: the start of the
+ *                                           "In-app docs" scene — named, so it survives retiming)
  *   npm run record-tour -- --from 22 --seconds 4   a trial stretch (trial-*.mp4 in the temp folder)
  *   npm run record-tour -- --from 22 --seconds 4 --dump 120   also its raw frame 120 (trial-frame.png)
  *
@@ -40,8 +41,9 @@ const option = (name, fallback) => {
 };
 const FPS = option('fps', 60);
 const LIMIT_SECONDS = option('seconds', Infinity);
-/** The tour time (s) whose frame becomes the poster (shown before the video plays). */
-const POSTER_AT = option('poster-at', 21);
+/** The tour time (s) whose frame becomes the poster (shown before the video plays); NaN = the
+ *  tour's own "info" scene start, read from the page. */
+const POSTER_AT_OPTION = option('poster-at', NaN);
 /** Start capturing at this tour time (s): for trying settings on one stretch. */
 const FROM = option('from', 0);
 /** Also save captured frame N (0-based) as trial-frame.png, to check the capture itself. */
@@ -197,7 +199,9 @@ async function main() {
       if (message.type() === 'warning' && message.text().startsWith('[tour]')) console.warn(message.text());
     });
     await page.addInitScript(installSteppedClock);
-    await page.goto(`http://127.0.0.1:${port}/landing/ad/tour.html?embed&debug&capture`);
+    // pr=2: the guitar, organ and hellscape scenes render at the capture's full 2x (their quality
+    // tuning; the piano stage keeps its own).
+    await page.goto(`http://127.0.0.1:${port}/landing/ad/tour.html?embed&debug&capture&pr=2`);
     const cdp = await page.context().newCDPSession(page);
 
     const tmpNames = RENDITIONS.map((r) => join(outDir, `${OUT_PREFIX}${r.height}.part.mp4`));
@@ -222,6 +226,7 @@ async function main() {
       if (await page.evaluate(() => window.__tour.isBuffering())) await realStep();
     }
 
+    const POSTER_AT = Number.isFinite(POSTER_AT_OPTION) ? POSTER_AT_OPTION : await page.evaluate(() => window.__adAt('info', 0));
     const first = await state();
     const maxFrames = Math.min(Math.round(first.total * FPS), Math.round(LIMIT_SECONDS * FPS));
     const startedAt = Date.now();

@@ -138,6 +138,9 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
         <filter id="fV3" x="-2%" y="-10%" width="104%" height="120%"><feGaussianBlur stdDeviation="0 3"/></filter>
         <filter id="fV10" x="-2%" y="-10%" width="104%" height="120%"><feGaussianBlur stdDeviation="0 10"/></filter>
         <filter id="fV26" x="-2%" y="-15%" width="104%" height="130%"><feGaussianBlur stdDeviation="0 26"/></filter>
+        <filter id="fH6" x="-10%" y="-2%" width="120%" height="104%"><feGaussianBlur stdDeviation="6 0"/></filter>
+        <filter id="fH18" x="-15%" y="-2%" width="130%" height="104%"><feGaussianBlur stdDeviation="18 0"/></filter>
+        <filter id="fH40" x="-20%" y="-2%" width="140%" height="104%"><feGaussianBlur stdDeviation="40 0"/></filter>
         <clipPath id="surClip"><rect id="surA" x="0" y="0" width="1600" height="300"/><rect id="surB" x="0" y="620" width="1600" height="380"/></clipPath>
         <pattern id="pDots" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1.2" fill="#aeacb8" opacity=".16"/></pattern>
       </defs>
@@ -216,6 +219,7 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
   </div>
 </div>
 <script src="piano-stage.js"></script>
+<script src="scenes-stage.js"></script>
 <script>
 (() => {
 'use strict';
@@ -261,6 +265,12 @@ const SC = [
   { id: 'intro',    d: 3.6, kind: 'intro', rest: 1.8 },
   { id: 'stage',    d: 4.3, kind: 'stage', eb: 'The stage',       cap: 'The lights come up on a grand piano.', ci: 1.6, rest: 3.4 },
   { id: 'piano',    d: 4.8, kind: 'stage', eb: 'Play the piano', cap: 'Play from your keyboard, or click and tap the keys — chords too.', ci: 1.3, rest: 3.9 },
+  // 2026-10-12, Deepak: "include the other 3 scenes … a trendy speed up slow down transition between the
+  // rest 3 and … aura farm a scene from them" — the guitar's magic flight, the organ blooming out of the
+  // petals, the hellscape's spell writing itself (see "the other three scenes" below).
+  { id: 'guitar',   d: 6.2, kind: 'stage', eb: 'Under the oak',    cap: 'Play the guitar, and it takes flight.', ci: 1.2, rest: 2.0 },
+  { id: 'organ',    d: 6.0, kind: 'stage', eb: 'Under the sakura', cap: 'Play the organ, and it blooms out of the petals.', ci: 1.2, rest: 4.4 },
+  { id: 'synth',    d: 6.4, kind: 'stage', eb: 'The hellscape',    cap: 'A spell writes itself across the sky.', ci: 1.4, rest: 5.0 },
   { id: 'nodes',    d: 4.5, col: 'audio',  gl: 'audio',  eb: 'Nodes',         cap: 'Each node here is a real sound, and every wire carries it.', ci: 1.4, rest: 3.6 },
   { id: 'live',     d: 3.8, col: 'audio',  gl: 'audio',  eb: 'Live previews', cap: 'Waves draw live on the nodes — and Auto-run plays every change.', ci: 0.25, rest: 3.0 },
   { id: 'info',     d: 4.3, col: 'signal', gl: 'signal', eb: 'In-app docs',   cap: 'Hover a node and ⓘ explains it in plain words.', ci: 1.3, rest: 3.5 },
@@ -451,7 +461,7 @@ function liveSync(t) {
 
 /* ---------- panels (segments) with per-property keyframe tracks ---------- */
 const SEGS = [];
-const DEF = { u: 720, v: 450, x: 800, y: 490, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], vb: 0 };
+const DEF = { u: 720, v: 450, x: 800, y: 490, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], vb: 0, hb: 0 };
 /** A panel: `{ stage: 's01' | 's02' }` hosts the 3D stage's canvas and overlays; `{ live: <scene id> }`
  *  holds a live app screen (its frame is mounted by liveFramesAt, over the panel's dark backdrop). */
 function seg(screen, keys) {
@@ -495,7 +505,7 @@ function poseAt(sg, t) {
   p.in = t >= sg.t0 && t <= sg.t1;
   return withTrig(p);
 }
-const IDP = withTrig({ u: 0, v: 0, x: 0, y: 0, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], in: true });
+const IDP = withTrig({ u: 0, v: 0, x: 0, y: 0, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], hb: 0, in: true });
 /* Same math as the CSS: translate3d · rotateX · rotateY · rotateZ · scale · translate(-u,-v), then the
    parent's perspective (1400px, origin 800/500). Lets particles sit on exact pixels of a live screen (1440×900). */
 function proj(p, u, v) {
@@ -518,6 +528,7 @@ function applySeg(sg, p, o) {
   if (blur > 0.25) parts.push(`blur(${blur.toFixed(2)}px)`);
   if (p.l < 0.995) parts.push(`brightness(${(0.22 + 0.78 * p.l).toFixed(3)})`);
   if (p.vb > 0.5 && !reduced) parts.push(`url(#fV${p.vb >= 18 ? 26 : p.vb >= 6 ? 10 : 3})`);
+  if (p.hb > 1 && !reduced) parts.push(`url(#fH${p.hb >= 28 ? 40 : p.hb >= 10 ? 18 : 6})`);
   const fl = parts.length ? parts.join(' ') : 'none';
   if (fl !== c.fl) { sg.el.style.filter = fl; c.fl = fl; }
   const cc = p.c;
@@ -807,14 +818,202 @@ const s02 = seg({ stage: 's02' }, [
   [T('piano', 0.25), { u: 722, v: 497, x: 800, y: 470, s: 0.6, o: 0, z: 0 }],
   [T('piano', 0.95), { o: 1 }],
   [T('piano', 1.35), { s: 1.111, u: 720, v: 470 }, 'o'],
-  [T('piano', 4.8), { s: 1.3, u: 700, v: 560 }],
-  [T('nodes', 0), { z: 0, x: 800, ry: 0, o: 1, b: 0, l: 1 }],
-  [T('nodes', 1.1), { z: -1000, x: 420, ry: 28, o: 0, b: 4, l: 0.35 }, 'i']
+  [T('guitar', -0.42), { s: 1.25, u: 700, v: 540, x: 800, ry: 0, hb: 0 }],
+  [T('guitar', 0), { x: -950, ry: 24, s: 1.5, hb: 40 }, 'i'],
+  [T('guitar', 0.06), { o: 1 }],
+  [T('guitar', 0.1), { o: 0 }]
 ]);
 const KEYS = [[565, 760], [634, 760], [702, 760]]; // the lit A / D / G keys (C, E, G)
 KEYS.forEach(([u, v], i) => rise({ seg: s02, u, v, t0: T('piano', 1.7 + i * 0.45), col: COL.gold, n: 20 }));
 KEYS.forEach(([u, v]) => rise({ seg: s02, u, v, t0: T('piano', 3.3), col: COL.gold, n: 30, life: 2.0 }));
-dust({ seg: s02, rect: [150, 0, 1300, 520], n: 70, col: COL.gold, t0: T('piano', 0.8), t1: T('nodes', 1.0), speed: 7 });
+dust({ seg: s02, rect: [150, 0, 1300, 520], n: 70, col: COL.gold, t0: T('piano', 0.8), t1: T('guitar', 0.05), speed: 7 });
+
+/* ---------- the other three scenes: the guitar, the organ, the hellscape ----------
+ * The app's own scenes (`scenes-stage.js`, built from src/landing/meadow + src/landing/hell by
+ * scripts/build-tour-stage.mjs), each on its own canvas in a stage panel. The tour drives their clocks
+ * itself — their own loops are stopped (`debug.stop`) and each tour frame advances them with
+ * `debug.renderAt` — so their speed is the tour's to shape: the TRENDY SPEED RAMP. Each scene's time
+ * runs on a speed curve (keys: [seconds into the scene, speed]): it comes in fast behind a whip pan,
+ * slows to slow motion over its hero moment, and speeds up again into the next whip.
+ *   guitar  "Play the guitar", the magic move: it rises (slow), flies to the oak, hovers in the gold
+ *           spiral of motes (slow), lands — a low camera behind it, looking up (the tour's own).
+ *   organ   "Play the organ", the bloom: the flyby round the sakura, then the camera swoops in close
+ *           while the petals gather into the organ (slow).
+ *   synth   the hellscape's opening: the spell builds in time-lapse, the great seal ignites (slow).
+ * A scene is made a few seconds before its panel shows (the clock waits for it, like a live screen)
+ * and given back after. */
+const S3_LEAD = 8, S3_TAIL = 1.5;
+function speedCurve(s0, keys) {
+  const l0 = keys[0][0], l1 = keys[keys.length - 1][0], dt = 1 / 240, tab = new Float64Array(Math.ceil((l1 - l0) / dt) + 2);
+  const sp = (l) => {
+    for (let i = 1; i < keys.length; i++) if (l <= keys[i][0]) { const [a, va] = keys[i - 1], [b, vb] = keys[i], k = (l - a) / (b - a), e = k * k * (3 - 2 * k); return va + (vb - va) * e; }
+    return keys[keys.length - 1][1];
+  };
+  let sim = s0;
+  for (let i = 0; i < tab.length; i++) { tab[i] = sim; sim += sp(l0 + (i + 0.5) * dt) * dt; }
+  return (l) => tab[Math.max(0, Math.min(tab.length - 1, Math.round((l - l0) / dt)))];
+}
+/** The tour's own camera for a scene's hero shot, blended over the scene's camera by `w(sim)`. */
+function heroCamera(scene, find, pose, weight) {
+  const world = scene.debug.world, cam = world.camera;
+  let target = null;
+  world.scene.traverse((o) => { if (!target && find(o)) target = o; });
+  if (!target) return;
+  const at = cam.position.clone(), p0 = cam.position.clone(), q0 = cam.quaternion.clone(), heroPos = cam.position.clone();
+  const render = world.render.bind(world);
+  world.render = (t, dt) => {
+    const w = weight(t);
+    if (w > 0) {
+      target.getWorldPosition(at);
+      const h = pose(at, t);
+      p0.copy(cam.position); q0.copy(cam.quaternion);
+      const f0 = cam.fov;
+      heroPos.set(h.pos[0], h.pos[1], h.pos[2]);
+      cam.position.copy(heroPos); cam.lookAt(h.look[0], h.look[1], h.look[2]);
+      const q1 = cam.quaternion.clone();
+      cam.position.lerpVectors(p0, heroPos, w);
+      cam.quaternion.slerpQuaternions(q0, q1, w);
+      cam.fov = f0 + (h.fov - f0) * w;
+      cam.updateProjectionMatrix();
+    }
+    render(t, dt);
+  };
+}
+const smooth01 = (x) => { const k = clamp(x); return k * k * (3 - 2 * k); };
+const S3 = [
+  { id: 'guitar', kind: 'guitar', move: 'magic', hero: 1.8,
+    sim: speedCurve(0, [[-0.45, 2.2], [0.05, 1.1], [0.5, 0.4], [2.6, 0.4], [3.1, 1.3], [3.9, 1.3], [4.4, 0.45], [5.4, 0.45], [5.8, 3], [6.7, 5]]),
+    // Low, behind the guitar against its flight (start → landing), swinging round as it goes, looking up at it.
+    camera: (scene) => heroCamera(scene, (o) => o.name.startsWith('guitar-'), (g, t) => {
+      const a = -0.95 + 0.32 * t, bx = -0.611, bz = 0.792, ca = Math.cos(a), sa = Math.sin(a), d = 2.3 + 0.25 * t;
+      return { pos: [g.x + (bx * ca - bz * sa) * d, Math.max(0.3, g.y - 0.45), g.z + (bx * sa + bz * ca) * d], look: [g.x, g.y + 0.18, g.z], fov: 46 };
+    }, () => 1) },
+  { id: 'organ', kind: 'sakura', move: 'bloom', hero: 6.3,
+    sim: speedCurve(2.4, [[-0.45, 3.0], [0.2, 2.0], [0.6, 0.4], [3.9, 0.4], [4.5, 1.0], [5.1, 3.0], [6.5, 5]]),
+    // The flyby round the tree, then a swoop in to a slow close orbit while the petals gather.
+    camera: (scene) => heroCamera(scene, (o) => o.name === 'organ', (o, t) => {
+      const a = 1.426 + 0.85 - 0.3 * (t - 4.5), r = 3.4 - 0.25 * (t - 4.5);
+      return { pos: [o.x + Math.sin(a) * r, o.y + 1.4, o.z + Math.cos(a) * r], look: [o.x, o.y + 1.15, o.z], fov: 44 };
+    }, (t) => smooth01((t - 3.9) / 0.8)) },
+  { id: 'synth', kind: 'hell', hero: 17.3,
+    sim: speedCurve(0, [[-0.45, 2.5], [0.0, 6.0], [1.55, 6.0], [2.4, 1.8], [3.7, 1.5], [4.15, 0.25], [5.6, 0.25], [6.1, 1.0], [7.6, 1.0]]) },
+];
+function s3Make(sc) {
+  const canvas = document.createElement('canvas');
+  sc.host.insertBefore(canvas, sc.host.firstChild);
+  const S = window.NodestraScenes;
+  const scene = sc.kind === 'hell'
+    ? S.createHellScene(canvas, { reducedMotion: reduced, demo: { audio: '', notes: '' } })
+    : S.createMeadowScene(sc.kind, canvas, { reducedMotion: reduced });
+  scene.resize(1440, 900);
+  scene.debug.stop(); // the tour drives its clock
+  if (sc.move) scene.setMove(sc.move);
+  if (sc.kind !== 'hell') { scene.setLive(true); sc.camera?.(scene); } // "Play": its tour starts at sim 0
+  Object.assign(sc, { canvas, scene, simT: 0, ready: false, failed: false, age: 0 });
+  Promise.resolve(scene.warm ? scene.warm() : undefined).then(() => { if (sc.scene === scene) { sc.ready = true; dirty = true; } }, (err) => s3Fail(sc, err));
+}
+function s3Drop(sc) {
+  try { sc.scene?.dispose(); } catch (err) { /* half-made: nothing more to free */ }
+  sc.canvas?.remove();
+  sc.scene = null; sc.canvas = null; sc.ready = false;
+}
+function s3Fail(sc, why) {
+  if (sc.failed) return;
+  console.warn(`[tour] the ${sc.kind} scene failed: ${why}`);
+  s3Drop(sc); sc.failed = true; dirty = true;
+}
+/** One step of the scene's own world (`draw` false: advance only — the hellscape's fast-forward). */
+function s3Advance(sc, to, draw) {
+  const hell = sc.kind === 'hell', max = hell ? 0.05 : 0.1;
+  while (sc.simT < to - 1e-6) {
+    const sub = Math.min(max, to - sc.simT);
+    sc.simT += sub;
+    const last = sc.simT >= to - 1e-6;
+    if (hell) sc.scene.debug.renderAt(sc.simT, sub, draw && last); else if (last || !hell) sc.scene.debug.renderAt(sc.simT, sub);
+  }
+}
+/** Makes the scenes near `t`, gives the rest back; true while one about to show is not ready. */
+function scenesAt(t, dt) {
+  let waiting = false;
+  for (const sc of S3) {
+    const near = inWin(t, sc.win[0] - S3_LEAD, sc.win[1] + S3_TAIL);
+    if (near && !sc.scene && !sc.failed) {
+      try { s3Make(sc); } catch (err) { s3Fail(sc, err); }
+    } else if (!near && (sc.scene || sc.failed)) { s3Drop(sc); sc.failed = false; }
+    if (!sc.scene || sc.ready || sc.failed) continue;
+    sc.age += dt;
+    if (sc.age > LIVE_DEADLINE) { s3Fail(sc, `not ready ${LIVE_DEADLINE} s after it was made`); continue; }
+    if (inWin(t, sc.win[0] - 0.25, sc.win[1])) waiting = true;
+  }
+  return waiting;
+}
+/** Each shown scene at its time on the speed curve (a seek backwards makes it again). */
+function scenesSync(t) {
+  for (const sc of S3) {
+    if (!sc.scene || !sc.ready) continue;
+    if (!sc.seg.vis) {
+      // Hidden, before its panel shows: rolled on to where it comes in, so its first frame is ready.
+      const entry = reduced ? sc.hero : sc.sim(sc.win[0] - T(sc.id, 0));
+      if (inWin(t, sc.win[0] - S3_LEAD, sc.win[0]) && sc.simT < entry - 1e-6) s3Advance(sc, entry, true);
+      continue;
+    }
+    const target = reduced ? sc.hero : sc.sim(t - T(sc.id, 0));
+    if (target < sc.simT - 1e-6) { s3Drop(sc); s3Make(sc); continue; }
+    if (reduced) { if (sc.simT < target) s3Advance(sc, target, true); continue; }
+    if (target > sc.simT + 1e-6) s3Advance(sc, target, true);
+  }
+}
+/** A scene's panel: a whip pan in (from the right, decelerating: the speed ramp's slow-down), held, a
+ *  whip out (accelerating left) into the next. `last`: the hellscape hands over to the effects graph. */
+function scenePanel(sc, focus, last) {
+  const host = document.createElement('div'); host.className = 'livehost';
+  const id = sc.id, next = SC[IDX[id] + 1].id;
+  const keys = [
+    [T(id, -0.06), { u: 720, v: 450, x: 2550, y: 470, z: 0, s: 1.35, ry: -24, o: 1, l: 1, b: 0, hb: 40 }],
+    [T(id, 0.5), { x: 800, s: 1.111, ry: 0, hb: 0 }, 'o5'],
+    // Held in place (x, ry, blur pinned) while it slowly pushes in; only the whip out moves it.
+    [T(id, SC[IDX[id]].d - 0.42), { s: focus.s, u: focus.u, v: focus.v, x: 800, ry: 0, hb: 0 }, 'io'],
+  ];
+  if (last) {
+    keys.push([T(next, 0), { z: 0, x: 800, ry: 0, o: 1, b: 0, l: 1 }]);
+    keys.push([T(next, 1.1), { z: -1000, x: 420, ry: 28, o: 0, b: 4, l: 0.35 }, 'i']);
+  } else {
+    keys.push([T(next, 0), { x: -950, ry: 24, s: focus.s * 1.25, hb: 40 }, 'i']);
+    keys.push([T(next, 0.06), { o: 1 }]);
+    keys.push([T(next, 0.1), { o: 0 }]);
+  }
+  const sg = seg({}, keys);
+  sg.el.appendChild(host);
+  Object.assign(sc, { host, seg: sg, win: reduced ? [T(id, 0) - 0.9, T(next, 0)] : [sg.t0, sg.t1] });
+  return sg;
+}
+const sGuitar = scenePanel(S3[0], { s: 1.2, u: 720, v: 430 });
+const sOrgan = scenePanel(S3[1], { s: 1.2, u: 700, v: 460 });
+const sHell = scenePanel(S3[2], { s: 1.22, u: 720, v: 380 }, true);
+const SPELL = [[650, 380], [720, 330], [790, 380]]; // the great seal over the tower (the notes' wires leave from it)
+/* The whip's cut: a gold flash and a burst of horizontal speed lines. */
+function whip(t0, col) {
+  const seed = seedN++ * 211;
+  fx(t0 - 0.28, t0 + 0.45, (t) => {
+    const k = t - t0;
+    const flash = k < 0 ? Math.pow(clamp((k + 0.28) / 0.28), 3) : Math.pow(clamp(1 - k / 0.45), 2);
+    dot(OX, OY, 1300, col, 0.5 * flash, true);
+    dot(OX, OY, 620, '#ffffff', 0.32 * flash, true);
+    const speed = Math.exp(-Math.pow(k / 0.16, 2));
+    for (let j = 0; j < 46; j++) {
+      const r1 = rnd(seed + j * 3), r2 = rnd(seed + j * 3 + 1), r3 = rnd(seed + j * 3 + 2);
+      const y = r1 * H, len = 160 + r2 * 520, x = frac(r3 - k * (2.6 + r2 * 2)) * (W + len * 2) - len;
+      line([x, y], [x + len, y], j % 3 ? col : '#ffffff', 1 + r2 * 2.2, speed * (0.18 + r3 * 0.4));
+    }
+  });
+}
+whip(T('guitar', 0), COL.gold);
+whip(T('organ', 0), '#ffc4dc');
+whip(T('synth', 0), '#ff5a4a');
+/* A little more aura on each hero shot, in the scene's own light. */
+dust({ seg: sGuitar, rect: [300, 120, 1140, 700], n: 46, col: COL.gold, t0: T('guitar', 0.6), t1: T('organ', 0), speed: 9 });
+dust({ seg: sOrgan, rect: [250, 80, 1190, 760], n: 54, col: '#ffd6e6', t0: T('organ', 0.6), t1: T('synth', 0), speed: 6 });
+dust({ seg: sHell, rect: [380, 60, 1060, 640], n: 40, col: '#ff6a5a', t0: T('synth', 3.8), t1: T('nodes', 0.9), speed: 5 });
 
 /* S2/S3 — the effects graph (06). Notes become wires; audio flows along the real wires. */
 const s06 = seg({ live: 'effects' }, [
@@ -829,7 +1028,7 @@ const s06 = seg({ live: 'effects' }, [
   [T('info', 1.45), { o: 0 }]
 ]);
 const OSCP = [[379, 212], [379, 418], [379, 623]]; // each Oscillator's live wave preview
-KEYS.forEach(([u, v], i) => stream({ t0: T('nodes', 0.05 + i * 0.07), dur: 1.05, from: { seg: s02, u, v }, to: { seg: s06, u: OSCP[i][0], v: OSCP[i][1] },
+SPELL.forEach(([u, v], i) => stream({ t0: T('nodes', 0.05 + i * 0.07), dur: 1.05, from: { seg: sHell, u, v }, to: { seg: s06, u: OSCP[i][0], v: OSCP[i][1] },
   colors: [COL.audio, COL.gold, COL.audio], n: 70, lift: -200 + i * 70, width: 10, sparkScale: 0.7 }));
 edgeFlash({ seg: s06, t0: T('nodes', 1.15), col: COL.audio });
 // Oscillator ×3 → Mix → Wobble → Stutter → Big Space → Gain → Render (socket to socket)
@@ -1272,6 +1471,7 @@ function render(t) {
     }
   }
   stageGate();
+  scenesSync(t);
   // captions + scrims
   let aB = 0, aT = 0;
   SC.forEach((s, k) => {
@@ -1322,8 +1522,8 @@ function setBuffering(v) {
 function frame(ts) {
   raf = requestAnimationFrame(frame);
   const rdt = last === null ? 0 : (ts - last) / 1000; last = ts;
-  const waiting = liveFramesAt(t, Math.min(1, rdt));
-  setBuffering(waiting && playing);
+  const waiting = liveFramesAt(t, Math.min(1, rdt)) | scenesAt(t, Math.min(1, rdt));
+  setBuffering(!!waiting && playing);
   if (playing && !waiting) { t += Math.min(0.05, rdt); if (t >= TOTAL) t -= TOTAL; dirty = true; }
   if (dirty) { render(t); dirty = false; }
 }
@@ -1331,7 +1531,7 @@ function run() { if (!raf && started && !document.hidden) { last = null; raf = r
 function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; }
 function setPlaying(v) { playing = v; hud.classList.toggle('on', !v); dirty = true; dispatchEvent(new CustomEvent('tourplaying', { detail: playing })); }
 function seek(to) { t = ((to % TOTAL) + TOTAL) % TOTAL; if (started) pin = null; dirty = true; if (!raf) render(t); }
-if (QS.has('debug')) { window.__adSeek = (x) => { halt(); seek(x); render(t); }; window.__adTotal = TOTAL; window.__adNow = () => t; }
+if (QS.has('debug')) { window.__adSeek = (x) => { halt(); seek(x); render(t); }; window.__adTotal = TOTAL; window.__adNow = () => t; window.__adAt = (id, l = 0) => T(id, l); }
 function skip(dir) {
   const i = sceneAt(t);
   if (dir > 0) seek(SC[(i + 1) % SC.length].start + 0.001);

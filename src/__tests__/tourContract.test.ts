@@ -147,6 +147,12 @@ function bootTour({ reduced = false } = {}) {
   return { win, frames, live, scene, events, step, flushTimers, post, warn, error, origin };
 }
 
+/** A moment of the tour, `offset` seconds into scene `id`, read from the tour itself (debug
+ *  `__adAt`), so these tests follow its layout when scenes are added or retimed. */
+function at(tour: ReturnType<typeof bootTour>, id: string, offset: number): number {
+  return tour.win.__adAt(id, offset);
+}
+
 describe('tour.html liveness (stub DOM)', () => {
   it('starts without a 3D stage, once the first live screen is ready', () => {
     const tour = bootTour();
@@ -185,7 +191,7 @@ describe('tour.html liveness (stub DOM)', () => {
     tour.flushTimers();
     tour.step();
 
-    tour.win.__tour.skipBy(12); // 12 s: the info screen mounts (10 s ahead of 21.85)
+    tour.win.__tour.skipBy(at(tour, 'info', 0.85) - 9.85 - tour.win.__adNow()); // the info screen mounts (10 s ahead of its window)
     tour.step();
     const info = tour.scene('info');
     expect(info).toBeDefined();
@@ -193,7 +199,7 @@ describe('tour.html liveness (stub DOM)', () => {
     expect(info!.removed).toBe(true);
     expect(tour.warn).toHaveBeenCalledWith('[tour] scene info failed: boom');
 
-    tour.win.__tour.skipBy(21.7 - tour.win.__adNow()); // inside info's window: no wait
+    tour.win.__tour.skipBy(at(tour, 'info', 0.7) - tour.win.__adNow()); // inside info's window: no wait
     tour.step(5);
     expect(tour.win.__tour.isBuffering()).toBe(false);
     expect(tour.scene('info')).toBeUndefined(); // not remounted inside its window
@@ -201,7 +207,7 @@ describe('tour.html liveness (stub DOM)', () => {
     tour.step(10);
     expect(tour.win.__adNow()).toBeGreaterThan(before);
 
-    tour.win.__tour.skipBy(25.2 - tour.win.__adNow()); // the add menu never reports: the clock waits…
+    tour.win.__tour.skipBy(at(tour, 'menu', -0.1) - tour.win.__adNow()); // the add menu never reports: the clock waits…
     tour.step(3);
     expect(tour.win.__tour.isBuffering()).toBe(true);
     expect(tour.events.some((e) => e.type === 'tourbuffering' && e.detail === true)).toBe(true);
@@ -228,10 +234,10 @@ describe('tour.html liveness (stub DOM)', () => {
     tour.post(tour.scene('effects')!, { type: 'showcase:ready' });
     tour.step();
     tour.flushTimers();
-    tour.win.__tour.skipBy(35);
+    tour.win.__tour.skipBy(at(tour, 'path', 0.9) - tour.win.__adNow());
     tour.step();
     expect(tour.scene('tutorial')).toBeUndefined();
-    tour.win.__tour.skipBy(37 - tour.win.__adNow());
+    tour.win.__tour.skipBy(at(tour, 'path', 2.9) - tour.win.__adNow());
     tour.step();
     expect(tour.scene('tutorial')).toBeDefined();
 
@@ -240,8 +246,8 @@ describe('tour.html liveness (stub DOM)', () => {
     still.post(still.scene('effects')!, { type: 'showcase:ready' });
     still.step();
     still.flushTimers();
-    for (const at of [40, 50, 58, 61, 64]) {
-      still.win.__tour.skipBy(at - still.win.__adNow());
+    for (const [id, offset] of [['curves', 1.4], ['library', 1.9], ['blip', 0.9], ['blip', 3.9], ['end', 0.9]] as const) {
+      still.win.__tour.skipBy(at(still, id, offset) - still.win.__adNow());
       still.step();
       expect(still.scene('tutorial')).toBeUndefined();
     }
