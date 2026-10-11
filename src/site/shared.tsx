@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { NodestraMark } from '../components/NodestraMark';
-import type { FrameQuery } from '../showcase/frame/protocol';
-import type { LiveCrop } from '../showcase/LiveSlot';
+import { SCREENS } from './screens';
 
 /*
  * What the landing page says, and its shared pieces. Every claim is on the
@@ -21,27 +20,6 @@ const NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: '#screens', label: 'Screens' },
   { href: '#features', label: 'Features' },
   { href: '#open-source', label: 'Open source' },
-];
-
-/** A real screen of the app, shown LIVE on the landing page: the whole app
- *  running a scene in a showcase frame (`src/showcase/appScenes.ts`). `crop`
- *  zooms in on part of the 1440x900 desktop layout; `tryItCorner` keeps the
- *  "Try it" button off what the card is showing. */
-type Shot = {
-  key: string;
-  showcase: FrameQuery;
-  title: string;
-  caption: string;
-  crop?: LiveCrop;
-  tryItCorner?: 'bottom-right' | 'top-right';
-};
-const SCREENS: Shot[] = [
-  { key: 'effects', showcase: { kind: 'app', scene: 'effects' }, title: 'A running effects graph', caption: 'Every node is a real sound. Green wires carry the audio; each node draws its wave live.' },
-  { key: 'add-menu', showcase: { kind: 'app', scene: 'addMenu' }, title: 'The Add menu, Easy Effects', caption: 'Eight Easy Effects wait in the Add menu, from Stutter to Crunch.', crop: { x: 1000, y: 360, scale: 1.45 } },
-  { key: 'inside-group', showcase: { kind: 'app', scene: 'insideGroup' }, title: 'Inside the Echo group', caption: 'Open one up and see the nodes that make it.' },
-  { key: 'timeline', showcase: { kind: 'app', scene: 'timeline' }, title: 'The timeline, playing', caption: 'Draw curves that move any setting while it plays.' },
-  { key: 'grid-finder', showcase: { kind: 'app', scene: 'gridFinder' }, title: 'The grid finder', caption: 'It suggests tempos that fit your notes, and shows how many land on the grid.', crop: { x: 720, y: 450, scale: 1.25 } },
-  { key: 'welcome', showcase: { kind: 'app', scene: 'welcome' }, title: 'Blip, on the Welcome page', caption: 'Blip, a small conductor, shows you what to click, step by step.', crop: { x: 1080, y: 720, scale: 1.6 }, tryItCorner: 'top-right' },
 ];
 
 type Feature = { key: string; color: string; title: string; text: string };

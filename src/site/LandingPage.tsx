@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createStageScene } from '../landing/stageScene';
 import { loadFrame } from '../showcase/loaders';
 import { LiveSlot } from '../showcase/LiveSlot';
-import { ShowcasePoster } from '../showcase/ShowcasePoster';
+import { SHOT_WIDTHS, shotImagePath } from './screens';
 import { TourPlayer } from './TourPlayer';
 import {
   FEATURES,
@@ -202,7 +202,27 @@ function PlayingCard({ shot, index, reduced }: { shot: (typeof SCREENS)[number];
         style={{ transform: rest, transformStyle: 'preserve-3d', animationDelay: `${index * -1.3}s` }}
       >
         <div className='relative overflow-hidden rounded-[16.5px] bg-[#0f0b09]'>
-          <LiveSlot load={loadFrame} props={{ query: shot.showcase }} poster={<ShowcasePoster title={shot.title} />} label={shot.title} crop={shot.crop} tryItCorner={shot.tryItCorner} />
+          {/* A still of the scene (scripts/capture-cards.mjs); the app itself
+              runs only behind "Try it". */}
+          <LiveSlot
+            load={loadFrame}
+            props={{ query: shot.showcase }}
+            autoLive={false}
+            poster={
+              <img
+                src={`${import.meta.env.BASE_URL}${shotImagePath(shot.key, SHOT_WIDTHS[0])}`}
+                srcSet={SHOT_WIDTHS.map((width) => `${import.meta.env.BASE_URL}${shotImagePath(shot.key, width)} ${width}w`).join(', ')}
+                sizes='(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw'
+                alt={`Screenshot: ${shot.title}`}
+                loading='lazy'
+                decoding='async'
+                className='block h-full w-full object-cover'
+              />
+            }
+            label={shot.title}
+            crop={shot.crop}
+            tryItCorner={shot.tryItCorner}
+          />
           <p className='px-4 py-3 text-[14px] text-[#f4ead8]/90'>{shot.caption}</p>
           {/* gloss: a sheen that sweeps across, and follows the pointer on hover */}
           <span aria-hidden='true' className='s5sheen pointer-events-none absolute inset-0' style={{ animationDelay: `${index * 0.9}s` }} />
