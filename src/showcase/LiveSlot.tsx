@@ -55,6 +55,12 @@ type LiveSlotProps<P> = {
    *  device). The poster then carries the button. */
   waitForTap?: boolean;
   tapLabel?: string;
+  /** false: the slot never runs the component itself — it shows its poster
+   *  (the landing's cards: a still of the scene) and "Try it" is always
+   *  offered; the component runs only in the "Try it" dialog (2026-10-12,
+   *  Deepak: "go with images, only switch when clicking try it"). Default
+   *  true: near the viewport it goes live in its own place. */
+  autoLive?: boolean;
   className?: string;
 };
 
@@ -146,7 +152,8 @@ function LiveDialog<P extends object>({
   label,
   onClose,
 }: {
-  Live: ComponentType<P & LiveComponentProps>;
+  /** Null while its code is still on the way (the dialog says "Loading"). */
+  Live: ComponentType<P & LiveComponentProps> | null;
   props: P;
   label: string;
   onClose(): void;
@@ -195,11 +202,13 @@ function LiveDialog<P extends object>({
             )}
             {/* Inert until it is set up: a click on the still-invisible app
                 would race the scene's own setup steps. */}
-            <div inert={!ready} className={`absolute inset-0 transition-opacity duration-300 ${ready ? 'opacity-100' : 'opacity-0'}`}>
-              <SlotBoundary onError={fail}>
-                <Live {...props} visible interactive label={label} onReady={() => setReady(true)} onFailed={fail} />
-              </SlotBoundary>
-            </div>
+            {Live && (
+              <div inert={!ready} className={`absolute inset-0 transition-opacity duration-300 ${ready ? 'opacity-100' : 'opacity-0'}`}>
+                <SlotBoundary onError={fail}>
+                  <Live {...props} visible interactive label={label} onReady={() => setReady(true)} onFailed={fail} />
+                </SlotBoundary>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -221,8 +230,11 @@ function LiveDialog<P extends object>({
  *                    slot gives its own place up meanwhile)
  *   far (2 screens)  unmounted again; its place goes to another slot
  *   failed           its poster, for good; it no longer asks for a place
+ *
+ * With `autoLive={false}` none of the above: the poster stays, "Try it" is
+ * always there, and the component runs only in the dialog.
  */
-function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFAULT_VIRTUAL, crop, fit = 'scale', tryIt = true, tryItCorner = 'bottom-right', nearMargin = '100% 0px', farMargin = '200% 0px', waitForTap = false, tapLabel = 'Load', className = '' }: LiveSlotProps<P>) {
+function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFAULT_VIRTUAL, crop, fit = 'scale', tryIt = true, tryItCorner = 'bottom-right', nearMargin = '100% 0px', farMargin = '200% 0px', waitForTap = false, tapLabel = 'Load', autoLive = true, className = '' }: LiveSlotProps<P>) {
   const box = useRef<HTMLDivElement>(null);
   const share = useRef(0);
   const handleRef = useRef<LiveSlotHandle | null>(null);
@@ -243,7 +255,7 @@ function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFA
 
   useEffect(() => {
     const element = box.current;
-    if (!element || !tapped) return undefined;
+    if (!element || !tapped || !autoLive) return undefined;
     // A tap is the visitor asking: it goes first.
     const explicit = waitForTap;
     const handle: LiveSlotHandle = {
@@ -284,7 +296,7 @@ function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFA
       size.disconnect();
       releaseLive(handle);
     };
-  }, [nearMargin, farMargin, tapped, waitForTap]);
+  }, [nearMargin, farMargin, tapped, waitForTap, autoLive]);
 
   // A failed component gives its place in the budget up (it shows its
   // poster for good).
@@ -378,7 +390,7 @@ function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFA
           )}
         </SlotBoundary>
       )}
-      {tryIt && offered && !failed && Live && (
+      {tryIt && !failed && (autoLive ? offered && Live : true) && (
         <button
           type='button'
           onClick={() => setTrying(true)}
@@ -387,7 +399,7 @@ function LiveSlot<P extends object>({ load, props, poster, label, virtual = DEFA
           Try it
         </button>
       )}
-      {trying && Live && <LiveDialog Live={Live} props={props} label={label} onClose={closeTrying} />}
+      {trying && (Live || !autoLive) && <LiveDialog Live={Live} props={props} label={label} onClose={closeTrying} />}
     </div>
   );
 }
