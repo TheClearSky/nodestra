@@ -11,7 +11,8 @@
     "type-check": "tsc --noEmit",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "record-tour": "node scripts/record-tour.mjs"
   },
   "dependencies": {
     "@headless-tree/core": "^1.7.0",
@@ -36,6 +37,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "esbuild": "^0.28.2",
     "memfs": "^4.79.0",
+    "playwright-core": "^1.64.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.2",
     "vite": "^7.1.4",

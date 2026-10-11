@@ -21,7 +21,29 @@ function labelled(label: string, step: ShowcaseStep): ShowcaseStep {
   return step;
 }
 
-const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+/** The next frame — or 100 ms, whichever comes first: a frame whose
+ *  document gets no animation frames (some engines starve a hidden iframe)
+ *  must still finish its steps, or time out, instead of waiting for ever. */
+const frame = () =>
+  new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    requestAnimationFrame(finish);
+    setTimeout(finish, 100);
+  });
+
+/** A slow device (the same test as the live scheduler's) gets three times
+ *  as long for every step: a phone boots the app several times slower. */
+const SLOW_DEVICE =
+  typeof navigator !== 'undefined' &&
+  ((navigator.hardwareConcurrency ?? 8) <= 4 ||
+    ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ||
+    (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches));
+const TIMEOUT_SCALE = SLOW_DEVICE ? 3 : 1;
 
 /** On screen, as a visitor could see it. Steps only ever act on these: right
  *  after a tab switch the previous tab's graph is briefly still in the
@@ -43,15 +65,35 @@ function clickElement(target: Element) {
   else target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
 }
 
-/** Waits until `find` returns an element (checked every frame). */
+/** Waits until `find` returns an element (checked every frame). Only time
+ *  the page is visible counts towards the timeout: a tab in the background
+ *  is not a scene that broke. */
 async function waitFor<T>(find: () => T | null | undefined, timeoutMs = 4000): Promise<T> {
-  const start = performance.now();
+  const limit = timeoutMs * TIMEOUT_SCALE;
+  let waited = 0;
+  let last = performance.now();
   for (;;) {
     const found = find();
     if (found) return found;
-    if (performance.now() - start > timeoutMs) throw new Error('[showcase] a setup step timed out');
+    const now = performance.now();
+    if (!document.hidden) waited += now - last;
+    last = now;
+    if (waited > limit) throw new Error('[showcase] a setup step timed out');
     await frame();
   }
+}
+
+/** The element to act on among those whose text matches: a visible one,
+ *  inside an open menu when there is one (menus are portaled to the end of
+ *  the body), and the innermost of nested matches — the row's own element,
+ *  not a wrapper whose text is the same. */
+function findByText(matches: (text: string) => boolean): HTMLElement | undefined {
+  const candidates = [...document.querySelectorAll<HTMLElement>('body *')].filter(
+    (element) => matches(element.textContent?.trim() ?? '') && isVisible(element),
+  );
+  const innermost = candidates.filter((element) => !candidates.some((other) => other !== element && element.contains(other)));
+  const inMenu = innermost.filter((element) => element.closest('[role="menu"], [role="menuitem"]'));
+  return (inMenu.length > 0 ? inMenu : innermost).at(-1);
 }
 
 function wait(ms: number): ShowcaseStep {
@@ -94,9 +136,9 @@ function pointAt(selector: string): ShowcaseStep {
 }
 
 /** Waits until `selector` (with `text`, when given) is visible. */
-function waitVisible(selector: string, text?: string): ShowcaseStep {
+function waitVisible(selector: string, text?: string, timeoutMs = 8000): ShowcaseStep {
   return labelled(`wait for ${selector}${text === undefined ? '' : ` '${text}'`}`, async ({ root }) => {
-    await waitFor(() => firstVisible(root, selector, text), 8000);
+    await waitFor(() => firstVisible(root, selector, text), timeoutMs);
   });
 }
 
@@ -139,25 +181,18 @@ function contextMenu(fx: number, fy: number): ShowcaseStep {
  *  outside the element. */
 function hover(text: string): ShowcaseStep {
   return labelled(`hover '${text}'`, async () => {
-    const row = await waitFor(() =>
-      [...document.querySelectorAll<HTMLElement>('body *')]
-        .filter((element) => element.textContent?.trim() === text && element.offsetParent !== null)
-        .at(-1),
-    );
+    const row = await waitFor(() => findByText((content) => content === text));
     row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body }));
   });
 }
 
-/** Clicks the deepest visible element whose text starts with `text` —
- *  anywhere in the showcase's document (menu rows are portaled to its body).
- *  The click bubbles to the row's own handler, as a visitor's would. */
+/** Clicks the visible element whose text starts with `text` (see
+ *  `findByText`) — anywhere in the showcase's document (menu rows are
+ *  portaled to its body). The click bubbles to the row's own handler, as a
+ *  visitor's would. */
 function clickText(text: string): ShowcaseStep {
   return labelled(`click text '${text}'`, async () => {
-    const target = await waitFor(() =>
-      [...document.querySelectorAll<HTMLElement>('body *')]
-        .filter((element) => element.textContent?.trim().startsWith(text) && element.offsetParent !== null)
-        .at(-1),
-    );
+    const target = await waitFor(() => findByText((content) => content.startsWith(text)));
     clickElement(target);
   });
 }

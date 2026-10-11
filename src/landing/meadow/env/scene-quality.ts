@@ -4,21 +4,32 @@
  * signals, then runtime adaptation from measured frame times.
  *
  * Startup (`?quality=low|medium|high` forces a tier):
- *  - WebGL renderer string: mobile GPUs (Mali, Adreno, PowerVR, Apple's
- *    mobile GPUs) → low; integrated (Intel, AMD APU "Radeon(TM) Graphics",
- *    "Vega 8") → one step down; software (SwiftShader, llvmpipe) → low;
+ *  - WebGL renderer string of the GPU a high-performance context gets (the
+ *    scenes ask for one; on a dual-GPU laptop a default context names the
+ *    other GPU): mobile GPUs (Mali, Adreno, PowerVR, Apple's mobile GPUs) →
+ *    low; integrated (Intel, AMD APU "Radeon(TM) Graphics", "Vega 8") → one
+ *    step down; software (SwiftShader, llvmpipe) → low. Safari names every
+ *    Apple GPU "Apple GPU", a Mac's and an iPhone's alike, so that string is
+ *    a phone's only on a touch-first device (the piano stage's rule);
  *  - navigator.hardwareConcurrency ≤ 4, navigator.deviceMemory ≤ 4 → one
  *    step down each (at most one in total);
  *  - screen pixels × DPR² above ~4.5 M → one step down;
  *  - coarse pointer (phones, tablets) → at most medium.
  *
  * Runtime: a ladder of finer levels inside the tier's own ceiling (grass
- * cards kept, flowers kept, pixel-ratio scale). Every 2 s (after a 4 s warm
- * up) the MEDIAN frame interval is checked (sporadic hitches don't count):
- * three windows in a row over budget (> 18.5 ms) → one level down; 12 s at
- * the vsync cap (< 17.4 ms) → one level up. A level that had to be left
- * again within 20 s of stepping up becomes the new ceiling (no oscillation).
+ * cards kept, flowers kept, pixel-ratio scale, MSAA). The ladder's machine is
+ * the piano stage's own (`createStageAdaptive` in src/landing/stageQuality.ts):
+ * after a 4 s warm up from the first frame, the MEDIAN frame interval of
+ * every 2 s window is checked (sporadic hitches don't count): three windows
+ * in a row over budget (> 18.5 ms) → one level down; 12 s at the vsync cap
+ * (< 17.4 ms) → one level up. A level that had to be left again within 20 s
+ * of stepping up becomes the new ceiling (no oscillation). An interval
+ * stretched by the loop's own frame cap is not counted as slow, and the
+ * window starts again after the loop was stopped.
  */
+
+import { createStageAdaptive, isStageTier, probeGpu } from '../../stageQuality';
+import type { StageSignals } from '../../stageQuality';
 
 export type Tier = 'high' | 'medium' | 'low';
 
@@ -48,24 +59,25 @@ export const TIERS: Record<Tier, TierParams> = {
 
 export type TierGuess = { params: TierParams; reasons: string[]; forced: boolean; gpu: string };
 
-export function detectTier(): TierGuess {
-  const forced = new URLSearchParams(location.search).get('quality') as Tier | null;
-  let gpu = '';
-  try {
-    const c = document.createElement('canvas');
-    const gl = (c.getContext('webgl2') ?? c.getContext('webgl')) as WebGLRenderingContext | null;
-    if (gl) {
-      const ext = gl.getExtension('WEBGL_debug_renderer_info');
-      gpu = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
-    }
-  } catch {
-    gpu = '';
-  }
-  if (forced && forced in TIERS) return { params: TIERS[forced], reasons: ['forced by ?quality'], forced: true, gpu };
+/** Everything the startup guess looks at (the piano stage's signals). */
+export type TierSignals = StageSignals;
+
+/** A `?quality=` value that names a tier (and nothing else: not
+ *  `__proto__`, not `toString`). */
+export function isTier(value: unknown): value is Tier {
+  return isStageTier(value);
+}
+
+/** The startup tier for these signals. */
+export function pickTier(signals: TierSignals): TierGuess {
+  const { gpu } = signals;
+  if (isTier(signals.forced)) return { params: TIERS[signals.forced], reasons: ['forced by ?quality'], forced: true, gpu };
   const reasons: string[] = [];
   let level = 2; // 2 high, 1 medium, 0 low
-  if (/mali|adreno|powervr|apple gpu|apple a\d|sgx|tegra/i.test(gpu)) {
+  // Safari reports every Apple GPU as "Apple GPU" — an iPhone's and an M2
+  // Mac's alike. Only a touch-first device is taken for a phone or tablet.
+  const appleMobile = /apple gpu/i.test(gpu) && signals.coarsePointer;
+  if (/mali|adreno|powervr|apple a\d|sgx|tegra/i.test(gpu) || appleMobile) {
     level = 0;
     reasons.push('mobile GPU');
   } else if (/swiftshader|llvmpipe|software|basic render/i.test(gpu)) {
@@ -75,25 +87,39 @@ export function detectTier(): TierGuess {
     level -= 1;
     reasons.push('integrated GPU');
   }
-  const cores = navigator.hardwareConcurrency ?? 8;
-  const memory = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8;
+  const cores = signals.cores ?? 8;
+  const memory = signals.memory ?? 8;
   if (cores <= 4 || memory <= 4) {
     level -= 1;
     reasons.push(cores <= 4 ? `${cores} cores` : `${memory} GB memory`);
   }
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const pixels = screen.width * screen.height * dpr * dpr;
+  const dpr = Math.min(signals.devicePixelRatio || 1, 2);
+  const pixels = signals.screenWidth * signals.screenHeight * dpr * dpr;
   if (pixels > 4.5e6) {
     level -= 1;
     reasons.push(`${(pixels / 1e6).toFixed(1)} M px`);
   }
-  if (matchMedia('(pointer: coarse)').matches && level > 1) {
+  if (signals.coarsePointer && level > 1) {
     level = 1;
     reasons.push('touch device');
   }
   const tier: Tier = level >= 2 ? 'high' : level === 1 ? 'medium' : 'low';
   if (!reasons.length) reasons.push('capable GPU');
   return { params: TIERS[tier], reasons, forced: false, gpu };
+}
+
+/** The scenes' tier on this device (reads the browser). */
+export function detectTier(): TierGuess {
+  return pickTier({
+    gpu: probeGpu(),
+    cores: navigator.hardwareConcurrency,
+    memory: (navigator as unknown as { deviceMemory?: number }).deviceMemory,
+    screenWidth: screen.width,
+    screenHeight: screen.height,
+    devicePixelRatio: window.devicePixelRatio || 1,
+    coarsePointer: matchMedia('(pointer: coarse)').matches,
+    forced: new URLSearchParams(location.search).get('quality'),
+  });
 }
 
 /** One rung of the runtime ladder (multipliers on the tier's params;
@@ -111,67 +137,67 @@ const LADDER: Rung[] = [
 ];
 
 export type Adaptive = {
-  /** Call once per rendered frame with performance.now(). */
-  frame(now: number): void;
+  /**
+   * Call once per RENDERED frame with performance.now(). `capped`: the loop
+   * skipped at least one animation frame since the last render because of
+   * its own 61 fps cap, so this interval is the cap's, not load (on a 144 Hz
+   * screen the cap renders every third vsync, 20.8 ms apart).
+   */
+  frame(now: number, capped?: boolean): void;
+  /** Forget the running window (the loop stopped and starts again): the gap
+   *  is not a slow frame, and the first frames back warm up again. */
+  reset(): void;
   rung(): number;
   label(): string;
 };
 
+/**
+ * The scene's ladder. Rung 0 is applied at once: the grass uniforms are
+ * shared by every scene the chunk makes (`grassQuality`), so a new scene must
+ * not inherit the rung the previous one had stepped down to.
+ */
 export function createAdaptive(apply: (r: Rung) => void, options: { enabled: boolean }): Adaptive {
-  let rung = 0;
-  let ceiling = 0; // the best rung allowed (0 = full)
-  const intervals: number[] = [];
-  let last = -1;
-  const startedAt = performance.now();
-  let windowStart = startedAt;
-  let bad = 0;
-  let goodSince = -1;
-  let steppedUpAt = -Infinity;
-  const set = (next: number) => {
-    rung = Math.max(ceiling, Math.min(LADDER.length - 1, next));
-    apply(LADDER[rung]);
-  };
+  const ladder = createStageAdaptive(LADDER.length, (level) => apply(LADDER[level]), options);
+  apply(LADDER[0]);
   return {
-    frame(now) {
-      if (last >= 0) intervals.push(now - last);
-      last = now;
-      if (!options.enabled || now - startedAt < 4000 || now - windowStart < 2000) return;
-      windowStart = now;
-      const sorted = intervals.splice(0).sort((a, b) => a - b);
-      if (sorted.length < 4) return;
-      const median = sorted[sorted.length >> 1];
-      if (median > 18.5) {
-        bad++;
-        goodSince = -1;
-        if (bad >= 3 && rung < LADDER.length - 1) {
-          // Left again soon after a step up: that rung is too much here.
-          if (now - steppedUpAt < 20000) ceiling = rung + 1;
-          set(rung + 1);
-          bad = 0;
-        }
-      } else {
-        bad = 0;
-        if (median < 17.4) {
-          if (goodSince < 0) goodSince = now;
-          if (now - goodSince > 12000 && rung > ceiling) {
-            set(rung - 1);
-            steppedUpAt = now;
-            goodSince = now;
-          }
-        } else goodSince = -1;
-      }
-    },
-    rung: () => rung,
-    label: () => (rung === 0 ? '' : ` · auto −${rung}`),
+    frame: ladder.frame,
+    reset: ladder.reset,
+    rung: ladder.level,
+    label: ladder.label,
+  };
+}
+
+/** The tuning knobs a URL may set (tests and measurements). */
+export type Tuning = { samples?: number; pr?: number; bloom?: number; grass?: number };
+
+/** `?samples=&pr=&bloom=&grass=`, validated: MSAA samples become 0, 2 or 4
+ *  (the nearest), the pixel-ratio cap stays within 0.5–2, the bloom scale
+ *  within 0–1 and the grass density within 0–1.5; a value that is not a
+ *  number is ignored. A crafted link must not be able to allocate a giant
+ *  drawing buffer or millions of grass cards. */
+export function readTuning(search: string): Tuning {
+  const q = new URLSearchParams(search);
+  const num = (k: string): number | undefined => {
+    const raw = q.get(k);
+    if (raw === null || raw.trim() === '') return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const clamp = (n: number | undefined, min: number, max: number) => (n === undefined ? undefined : Math.min(max, Math.max(min, n)));
+  const samples = num('samples');
+  return {
+    samples: samples === undefined ? undefined : [0, 2, 4].reduce((best, n) => (Math.abs(n - samples) < Math.abs(best - samples) ? n : best)),
+    pr: clamp(num('pr'), 0.5, 2),
+    bloom: clamp(num('bloom'), 0, 1),
+    grass: clamp(num('grass'), 0, 1.5),
   };
 }
 
 /** The stage's tier (detected once per page). */
 export function sceneQuality(): { guess: TierGuess; params: TierParams } {
   const guess = detectTier();
-  // Tuning overrides (tests): ?samples=&pr=&bloom=
-  const q = new URLSearchParams(location.search);
-  const num = (k: string) => (q.has(k) ? Number(q.get(k)) : undefined);
-  const params = { ...guess.params, samples: num('samples') ?? guess.params.samples, prCap: num('pr') ?? guess.params.prCap, bloom: num('bloom') ?? guess.params.bloom };
+  // Tuning overrides (tests): ?samples=&pr=&bloom= (validated: readTuning).
+  const tuning = readTuning(location.search);
+  const params = { ...guess.params, samples: tuning.samples ?? guess.params.samples, prCap: tuning.pr ?? guess.params.prCap, bloom: tuning.bloom ?? guess.params.bloom };
   return { guess, params };
 }

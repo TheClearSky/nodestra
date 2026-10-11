@@ -8,15 +8,22 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-type Slot = { priority(): number; mount(): void; unmount(): void; share: number; isLive: boolean };
+type Slot = { priority(): number; mount(): void; unmount(): void; share: number; isLive: boolean; boots: boolean };
 
-function slot(share: number): Slot {
+type Scheduler = typeof import('../showcase/liveScheduler');
+let current: Scheduler;
+
+/** A slot. By default it reports ready the moment it mounts (as if booting
+ *  were instant); `boots: true` leaves it booting until `ready(slot)`. */
+function slot(share: number, { boots = false } = {}): Slot {
   const handle: Slot = {
     share,
+    boots,
     isLive: false,
     priority: () => handle.share,
     mount: () => {
       handle.isLive = true;
+      if (!handle.boots) current.readyLive(handle);
     },
     unmount: () => {
       handle.isLive = false;
@@ -30,7 +37,8 @@ async function scheduler(budget: number, win: Record<string, unknown> = {}) {
   vi.stubGlobal('location', { search: `?live=${budget}` });
   vi.stubGlobal('window', win);
   vi.resetModules();
-  return import('../showcase/liveScheduler');
+  current = await import('../showcase/liveScheduler');
+  return current;
 }
 
 /** Lets every queued idle tick (a 60 ms timeout without requestIdleCallback) run. */
@@ -103,6 +111,75 @@ describe('live showcase scheduler', () => {
     requestLive(offScreen);
     await settle();
     expect(offScreen.isLive).toBe(true);
+  });
+
+  it('boots one slot at a time: the next waits for the last to report ready', async () => {
+    const { readyLive, requestLive } = await scheduler(3);
+    const [a, b] = [slot(1, { boots: true }), slot(0.9, { boots: true })];
+    requestLive(a);
+    requestLive(b);
+    await settle(10_000);
+    expect([a.isLive, b.isLive]).toEqual([true, false]);
+    readyLive(a);
+    await settle();
+    expect([a.isLive, b.isLive]).toEqual([true, true]);
+  });
+
+  it('never evicts a slot that is still booting', async () => {
+    const { requestLive, reprioritise } = await scheduler(1);
+    const booting = slot(0.1, { boots: true });
+    requestLive(booting);
+    await settle();
+    const better = slot(1);
+    requestLive(better);
+    reprioritise();
+    await settle(30_000);
+    expect(booting.isLive).toBe(true);
+    expect(better.isLive).toBe(false);
+  });
+
+  it('counts the settling time from ready, not from mount', async () => {
+    const { readyLive, requestLive, reprioritise } = await scheduler(1);
+    const old = slot(0.2, { boots: true });
+    requestLive(old);
+    await settle(100);
+    await settle(10_000);
+    readyLive(old);
+    const better = slot(1);
+    requestLive(better);
+    reprioritise();
+    await settle(1000);
+    // Booted for 10 s, but ready for only 1 s: not yet evictable.
+    expect(better.isLive).toBe(false);
+    await settle(5000);
+    expect(better.isLive).toBe(true);
+    expect(old.isLive).toBe(false);
+  });
+
+  it("a visitor's tap takes a place at once, booting or not, margin or not", async () => {
+    const { requestLive } = await scheduler(1);
+    const card = slot(1, { boots: true });
+    requestLive(card);
+    await settle();
+    expect(card.isLive).toBe(true);
+    const tour = slot(1);
+    requestLive(tour, { explicit: true });
+    await settle();
+    expect(tour.isLive).toBe(true);
+    expect(card.isLive).toBe(false);
+  });
+
+  it('a tapped slot is never displaced by a looked-ahead one', async () => {
+    const { requestLive, reprioritise } = await scheduler(1);
+    const tour = slot(0.1);
+    requestLive(tour, { explicit: true });
+    await settle();
+    const card = slot(1);
+    requestLive(card);
+    reprioritise();
+    await settle(30_000);
+    expect(tour.isLive).toBe(true);
+    expect(card.isLive).toBe(false);
   });
 
   it('a released place goes to the next waiting slot', async () => {

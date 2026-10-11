@@ -13,7 +13,10 @@
  *  so a scene can show the same stretch of the score as its approved look. */
 type SceneRecordingOptions = { startAt?: number };
 
-type SceneRecorder = (options: SceneRecordingOptions) => Promise<void>;
+/** 'recorded': the previews and playhead play the recording. 'nothing':
+ *  nothing on screen moves with the sound (no graph open). A failed
+ *  recording rejects. */
+type SceneRecorder = (options: SceneRecordingOptions) => Promise<'recorded' | 'nothing'>;
 
 let recorder: SceneRecorder | null = null;
 
@@ -27,9 +30,14 @@ function registerSceneRecorder(next: SceneRecorder): () => void {
 
 /** The frame, after the scene's steps: record and start playback. A scene
  *  with nothing to record (no graph open) resolves at once. */
-async function recordScene(options: SceneRecordingOptions = {}): Promise<void> {
-  await recorder?.(options);
+async function recordScene(options: SceneRecordingOptions = {}): Promise<'recorded' | 'nothing'> {
+  if (!recorder) {
+    // The App registers its recorder when it mounts in showcase mode; none
+    // here means that wiring broke, and every preview would stay flat.
+    throw new Error('no scene recorder is registered');
+  }
+  return recorder(options);
 }
 
 export { recordScene, registerSceneRecorder };
-export type { SceneRecorder, SceneRecordingOptions };
+export type { SceneRecordingOptions };

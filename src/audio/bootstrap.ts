@@ -100,7 +100,10 @@ async function startOfflineAudio(
 ): Promise<Tone.OfflineContext> {
   if (persistent) throw new Error('Audio already started');
   const context = new Tone.OfflineContext(2, durationSeconds, offlineSampleRate());
-  Tone.setContext(context);
+  // The default live context Tone made at import (never started here) is
+  // disposed — closed, its ticker worker stopped — rather than left idling
+  // for the frame's whole life.
+  Tone.setContext(context, true);
   await registerWorklets();
   buildPersistentBus({ withRecorder: false });
   return context;

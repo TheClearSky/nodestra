@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
   ExecutionRecord,
   GraphRunnerHandle,
@@ -130,21 +130,10 @@ import { STORAGE_NAMESPACE } from './storageNamespace';
 import { isLiveShowcase, isShowcase } from './appEnvironment';
 import { registerSceneRecorder } from './showcase/recording';
 import { noteShowcaseRunEvent, recordOpenGraph } from './audio/showcaseRecording';
+import { landingGraphState } from './soundDefinitions/landingGraphs';
 
 // The landing stage pulls in three.js: its own chunk, fetched only while the
 // start gate is up. The plain gate below stands in until it arrives.
-/** The demo each of the landing's play buttons installs — a probe graph or
- *  an Instrument-library demo. The sakura plays the library's Organ demo
- *  (2026-10-04, Deepak: "organ demo suits sakura scene the best"). */
-const LANDING_GRAPHS: Record<LandingInstrument, string> = {
-  piano: 'piano',
-  guitar: 'guitarKeys',
-  sakura: 'demoInst_inst_organ',
-};
-function landingGraphState(instrument: LandingInstrument) {
-  const id = LANDING_GRAPHS[instrument];
-  return id in instrumentDemoBuilders ? instrumentDemoBuilders[id]() : buildProbeGraphState(id);
-}
 const StageLanding = lazy(() =>
   import('./landing/StageLanding').then((module) => ({ default: module.StageLanding })),
 );
@@ -248,7 +237,7 @@ function App() {
   const [stageCovering, setStageCovering] = useState(true);
   const appHidden = stageShown && stageCovering;
   useEffect(() => {
-    setPreviewsPaused(appHidden);
+    setPreviewsPaused(appHidden, 'app');
   }, [appHidden]);
   // Focus lands somewhere useful once the app is revealed — not during the
   // fly-in, where it would steal Enter from the Skip button.
@@ -626,12 +615,13 @@ function App() {
   useEffect(() => {
     if (!isShowcase()) return;
     return registerSceneRecorder(async (options) => {
-      await recordOpenGraph({
+      const stats = await recordOpenGraph({
         startAt: options.startAt,
         hasGraph: () => runnerRef.current !== null,
         run: runGraphNow,
         showTransport: setTimelineTransport,
       });
+      return stats ? 'recorded' : 'nothing';
     });
   }, [runGraphNow]);
 
@@ -725,7 +715,7 @@ function App() {
   // the piano would install AFTER it — over the app, file detached.
   const landingPianoLoanRef = useRef<Promise<void>>(Promise.resolve());
   // The meadow scenes play their own instrument the same way (2026-10-04):
-  // the guitar under the oak, the Starry Pad under the sakura.
+  // the guitar under the oak, the organ under the sakura.
   const playLandingPiano = useCallback((instrument: LandingInstrument) => {
     landingPianoLoanRef.current = (async () => {
       await session.borrowCanvas();
@@ -752,22 +742,30 @@ function App() {
   }, [state, audioReady, runInFlight, runGraphNow]);
 
   // "Try it" on the landing page (a live showcase): no start gate, so audio
-  // starts on the visitor's first click or key inside the app — a gesture in
-  // this window, which is what browsers require.
+  // starts on the visitor's click or key inside the app — a gesture in this
+  // window, which is what browsers require. `pointerup`, not `pointerdown`:
+  // for a finger, only the lift counts as a gesture (a touch `pointerdown`
+  // does not), and Escape is no gesture at all. It keeps listening while
+  // audio is not running: a start that failed, or a context the system
+  // suspended later, is retried on the next gesture.
   const handleStartRef = useRef<() => Promise<void>>(async () => {});
+  const audioReadyRef = useRef(audioReady);
   useEffect(() => {
     if (!isLiveShowcase()) return;
+    let pending = false;
     const start = (event: Event) => {
       // The scene's own scripted clicks are not the visitor.
-      if (!event.isTrusted) return;
-      window.removeEventListener('pointerdown', start, true);
-      window.removeEventListener('keydown', start, true);
-      void handleStartRef.current();
+      if (!event.isTrusted || pending || audioReadyRef.current) return;
+      if (event instanceof KeyboardEvent && event.key === 'Escape') return;
+      pending = true;
+      void handleStartRef.current().finally(() => {
+        pending = false;
+      });
     };
-    window.addEventListener('pointerdown', start, true);
+    window.addEventListener('pointerup', start, true);
     window.addEventListener('keydown', start, true);
     return () => {
-      window.removeEventListener('pointerdown', start, true);
+      window.removeEventListener('pointerup', start, true);
       window.removeEventListener('keydown', start, true);
     };
   }, []);
@@ -785,12 +783,18 @@ function App() {
       setStartError(
         error instanceof Error ? error.message : 'Audio failed to start',
       );
+      // A showcase shows no start gate, so the console is where this lands.
+      if (isShowcase()) console.warn('[showcase] audio did not start; the next click retries', error);
     } finally {
       setStarting(false);
     }
   }
 
-  handleStartRef.current = handleStart;
+  // The latest of each, for the listeners above (assigned after commit).
+  useLayoutEffect(() => {
+    handleStartRef.current = handleStart;
+    audioReadyRef.current = audioReady;
+  });
 
   return (
     <>

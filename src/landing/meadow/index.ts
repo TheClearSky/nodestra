@@ -4,7 +4,7 @@
  * `setLive(false)` backs it off, `setLiveKey` follows the keyboard.
  *
  * `env/` and `gtr-*.ts` are COPIES of the experiment sources under
- * `.claude/pages/ad/experiments/` (`npm run sync:meadow` refreshes them); edit
+ * `.claude/pages/ad/experiments/` (`node scripts/sync-meadow.mjs` refreshes them); edit
  * there, where the experiment pages can show the change, then sync.
  */
 import { createGuitarScene } from './env/scene-guitar-stage';

@@ -58,6 +58,11 @@ function getTimelineRegistry(): TimelineDriverRegistry | undefined {
   return runtime.registry;
 }
 
+/** How far ahead of "now" a play starts: the playhead holds at its start
+ *  for this long while the first pass is written (see below). The showcase
+ *  recording's pre-roll must cover it (`audio/showcaseRecording.ts`). */
+const SCHEDULE_HEADROOM_SECONDS = 0.25;
+
 /** Idempotent; call once audio has started (the raw context then runs). */
 function ensureTimelineRuntime(): TimelineTransport {
   if (runtime.transport !== undefined) {
@@ -78,7 +83,7 @@ function ensureTimelineRuntime(): TimelineTransport {
     // overlapped them (seen as NotSupportedError "overlaps" on play).
     // 0.25 s buys the burst room; the playhead holds at the anchor that
     // long, which is imperceptible for these pieces.
-    scheduleHeadroomSeconds: 0.25,
+    scheduleHeadroomSeconds: SCHEDULE_HEADROOM_SECONDS,
   });
   return runtime.transport;
 }
@@ -95,6 +100,7 @@ function installPlaybackTransport(next: TimelineTransport): void {
 }
 
 export {
+  SCHEDULE_HEADROOM_SECONDS,
   ensureTimelineRuntime,
   installPlaybackTransport,
   getTimelineRegistry,

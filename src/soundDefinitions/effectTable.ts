@@ -6,9 +6,11 @@
  * THIS FILE IS METADATA ONLY, and must never import `tone`. Measured
  * 2026-10-09 with an esbuild metafile: when the Tone factories lived in these
  * rows, `nodeTypes.ts` pulled all of Tone (183 modules) into anything that
- * merely DESCRIBES a graph — every landing-page showcase frame among them,
- * each of which then created an AudioContext and logged "AudioContext was
- * not allowed to start". The audio half lives in `effectAudio.ts`, keyed by
+ * merely DESCRIBES a graph. (The editor-only showcases that found this are
+ * gone — the landing now runs the whole App — but describing a graph without
+ * the audio engine keeps every such use cheap, and
+ * `graphDescriptionToneFree.test.ts` holds the line.) The audio half lives
+ * in `effectAudio.ts`, keyed by
  * the ids below; the type there makes a missing or extra binding a compile
  * error, and `effectTableSplit.test.ts` checks the same at runtime.
  *

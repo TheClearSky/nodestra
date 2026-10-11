@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { NodestraMark } from '../components/NodestraMark';
-import type { AppSceneId } from '../showcase/appScenes';
+import type { FrameQuery } from '../showcase/frame/protocol';
+import type { LiveCrop } from '../showcase/LiveSlot';
 
 /*
  * What the landing page says, and its shared pieces. Every claim is on the
@@ -10,13 +11,12 @@ import type { AppSceneId } from '../showcase/appScenes';
 
 const TAGLINE = 'Build instruments and songs from nodes — and hear every change.';
 const SUBLINE = 'Wire up oscillators, physically modelled strings and ready-made effects. Every node is a real sound, and it plays as you build.';
-const TOUR_SRC = `${import.meta.env.BASE_URL}landing/ad/tour.html`;
 const GOLD = '#e9d3a8';
 
 /** Socket colours, as in the app (`src/soundDefinitions/dataTypes.ts`). */
 const SOCKET = { audio: '#2ECC71', signal: '#F1C40F', number: '#3498DB', gate: '#E74C3C', wave: '#9B59B6' } as const;
 
-const NAV = [
+const NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: '#tour', label: 'Tour' },
   { href: '#screens', label: 'Screens' },
   { href: '#features', label: 'Features' },
@@ -25,13 +25,15 @@ const NAV = [
 
 /** A real screen of the app, shown LIVE on the landing page: the whole app
  *  running a scene in a showcase frame (`src/showcase/appScenes.ts`). `crop`
- *  zooms in on part of the 1440x900 desktop layout. */
+ *  zooms in on part of the 1440x900 desktop layout; `tryItCorner` keeps the
+ *  "Try it" button off what the card is showing. */
 type Shot = {
   key: string;
-  showcase: { kind: 'app'; scene: AppSceneId };
+  showcase: FrameQuery;
   title: string;
   caption: string;
-  crop?: { x: number; y: number; scale: number };
+  crop?: LiveCrop;
+  tryItCorner?: 'bottom-right' | 'top-right';
 };
 const SCREENS: Shot[] = [
   { key: 'effects', showcase: { kind: 'app', scene: 'effects' }, title: 'A running effects graph', caption: 'Every node is a real sound. Green wires carry the audio; each node draws its wave live.' },
@@ -39,7 +41,7 @@ const SCREENS: Shot[] = [
   { key: 'inside-group', showcase: { kind: 'app', scene: 'insideGroup' }, title: 'Inside the Echo group', caption: 'Open one up and see the nodes that make it.' },
   { key: 'timeline', showcase: { kind: 'app', scene: 'timeline' }, title: 'The timeline, playing', caption: 'Draw curves that move any setting while it plays.' },
   { key: 'grid-finder', showcase: { kind: 'app', scene: 'gridFinder' }, title: 'The grid finder', caption: 'It suggests tempos that fit your notes, and shows how many land on the grid.', crop: { x: 720, y: 450, scale: 1.25 } },
-  { key: 'welcome', showcase: { kind: 'app', scene: 'welcome' }, title: 'Blip, on the Welcome page', caption: 'Blip, a small conductor, shows you what to click, step by step.', crop: { x: 1080, y: 720, scale: 1.6 } },
+  { key: 'welcome', showcase: { kind: 'app', scene: 'welcome' }, title: 'Blip, on the Welcome page', caption: 'Blip, a small conductor, shows you what to click, step by step.', crop: { x: 1080, y: 720, scale: 1.6 }, tryItCorner: 'top-right' },
 ];
 
 type Feature = { key: string; color: string; title: string; text: string };
@@ -55,13 +57,13 @@ const FEATURES: Feature[] = [
   { key: 'library', color: SOCKET.gate, title: 'Your library', text: 'Graphs saved in your browser, in folders and tabs; link a folder on your computer, import and export, record to a file.' },
 ];
 
-/** Node names that really exist in the app (Add menu / demos), for decorative type. */
-
-/** Into the app: always a FULL page load (see `routes.tsx`). */
+/** Into the app: always a FULL page load (see `routes.tsx`). `/app/`, with
+ *  its slash: that is the page GitHub Pages serves (`/app` answers with a
+ *  redirect to it). */
 function OpenAppButton({ large = false, className = '' }: { large?: boolean; className?: string }) {
   return (
     <Link
-      to='/app'
+      to='/app/'
       reloadDocument
       className={`inline-flex items-center gap-2 rounded-full border border-[#e9d3a8]/40 bg-white/8 font-medium text-primary-white shadow-[0_0_48px_rgba(255,190,110,0.22)] backdrop-blur-sm transition-colors hover:bg-white/16 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e9d3a8] ${large ? 'px-8 py-4 text-[18px]' : 'px-5 py-2 text-[14px]'} ${className}`}
     >
@@ -82,7 +84,7 @@ function SiteFooter() {
           <p className='text-[13px] text-primary-white/60'>{TAGLINE}</p>
         </div>
         <nav aria-label='Footer' className='grid grid-cols-2 gap-x-10 gap-y-2 text-[14px] text-primary-white/70'>
-          <Link to='/app' reloadDocument className='hover:text-primary-white'>
+          <Link to='/app/' reloadDocument className='hover:text-primary-white'>
             Open the app
           </Link>
           {NAV.map((item) => (
@@ -149,16 +151,12 @@ function useReducedMotion() {
 export {
   FEATURES,
   GOLD,
-  NAV,
   OpenAppButton,
   SCREENS,
   SiteFooter,
   SiteNav,
-  SOCKET,
   SUBLINE,
   TAGLINE,
-  TOUR_SRC,
   usePageTitle,
   useReducedMotion,
 };
-export type { Feature, Shot };

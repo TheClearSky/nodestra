@@ -411,8 +411,8 @@ function buildPianoGraph(): ProbeState {
 
 /**
  * One voice per key on the QWERTY row, into a short bus — the shape the
- * landing scenes play (2026-10-04: "Play the guitar" under the oak and the
- * Starry Pad under the sakura, next to "Play the piano"). The bus follows the
+ * guitar landing scene plays (2026-10-04: "Play the guitar" under the oak;
+ * the sakura plays the library's Organ demo instead). The bus follows the
  * solo tails (`buildSoloGraph`): optional body, optional chorus, makeup gain,
  * reverb, a 30 Hz highpass, then a limiter, because sixteen-plus voices sum.
  */
@@ -486,10 +486,9 @@ function buildGuitarKeysGraph(): ProbeState {
 }
 
 /**
- * The Starry Pad, one voice per key — what the landing's sakura scene plays
- * (Deepak: "starry pad set to a lower octave, will decide the instrument
- * later"; the scene shifts the keyboard down an octave, this graph stays at
- * the keyboard's octave). Tail as the "Starfield" solo minus its cutoff ride.
+ * The Starry Pad, one voice per key, at the keyboard's octave — a Demos-menu
+ * entry. (It was the sakura scene's first instrument; the sakura now plays
+ * the Organ demo.) Tail as the "Starfield" solo minus its cutoff ride.
  */
 function buildStarryPadKeysGraph(): ProbeState {
   return buildPerKeyGraph(
@@ -4951,7 +4950,7 @@ const probeGraphBuilders: Record<string, () => ProbeState> = {
   /** Landing scene: "Play the guitar" under the oak. See `buildGuitarKeysGraph`. */
   guitarKeys: () => buildGuitarKeysGraph(),
 
-  /** Landing scene: the sakura's Starry Pad. See `buildStarryPadKeysGraph`. */
+  /** The Starry Pad on every key. See `buildStarryPadKeysGraph`. */
   starryPadKeys: () => buildStarryPadKeysGraph(),
 
   dreamyPad: () => buildDreamyPadGraph(),

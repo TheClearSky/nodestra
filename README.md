@@ -21,7 +21,7 @@ waveform/audiogram previews, and a custom sound input component.
      │  import / export                                           │
      └──────┬──────────────────────┬────────────────────────┬─────┘
             │                      │                        │
-            │ peerDependency       │ peerDependency         │ file:
+            │ peerDependency       │ peerDependency         │ npm
             │ >=0.0.14 <1          │ >=0.0.14 <1            │ dependency
             │                      │ (via /contract —       │
             ▼                      ▼  React-free)           │
@@ -36,7 +36,7 @@ waveform/audiogram previews, and a custom sound input component.
   │ can read.            │  │ No React at runtime. │        │
   └──────────┬───────────┘  └──────────────────────┘        │
              │                                              │
-             │ file: dependency                             │
+             │ npm dependency                               │
              └───────────────────┬──────────────────────────┘
                                  ▼
      ┌────────────────────────────────────────────────────────────┐
@@ -53,6 +53,8 @@ waveform/audiogram previews, and a custom sound input component.
 
 An arrow points from a package **to the package that depends on it**. The
 two plugins never import each other — this app is the only place they meet.
+To work on a library and the app together, `npm link` the library; the dev
+server then reloads the app whenever the linked library rebuilds.
 The engine is MIT so anyone can build on it; the plugins and this app are
 AGPL-3.0-only, with commercial licensing available separately.
 
@@ -63,9 +65,13 @@ npm install
 npm run dev          # http://localhost:5173
 npm run type-check   # tsc --noEmit
 npm run test:unit    # vitest (DFT oracles + build lifecycle)
+npm run build        # the site, as deployed (see "The site" below)
 ```
 
-Click **"Click to start audio"** (browsers require a real gesture), then press
+`npm run dev` opens the **landing page**; the app itself is at `/app/`. It
+opens on a start stage (a piano, a guitar under an oak, an organ under a
+sakura): click **"Click to start audio"** (browsers require a real gesture),
+or play one of the scenes first. Then press
 the runner's **Run** — a Run BUILDS the live audio graph; re-Run replaces it;
 the toolbar **Stop** (or Esc) silences it.
 
@@ -96,6 +102,29 @@ the toolbar **Stop** (or Esc) silences it.
 - **URL flags:** `?muted=1` mutes the speakers only, while the meters keep
   measuring (useful for silent measurement runs); `?nosave=1` disables
   autosave. Flag semantics: present = on, except explicit `=0`/`=false`.
+  For development: `?quality=high|medium|low` forces the start stage's
+  rendering tier; on the landing page `?live=N` sets how many live showcases
+  may run at once and `?debug-live` exposes the scheduler; on a showcase
+  frame `?debug-steps` logs its setup steps.
+
+## The site
+
+Deployed to GitHub Pages by `.github/workflows/pages.yml` on every push to
+`main` (tests, then `npm run build` with `BASE_PATH=/<repo>/`). Never
+published by hand.
+
+| Path | What it is |
+| --- | --- |
+| `/` | The landing page: a tour, live screens of the app, features |
+| `/app/` | The app |
+| `/showcase.html?kind=app&scene=<id>` | The real app running one scene, for the landing page's screens and tour; its storage lives in memory only (`src/showcase/`) |
+| `/landing/ad/tour.html` | The tour, a hand-written page that shows live showcase frames |
+
+Generated files, rebuilt by `npm run build` (and committed so `npm run dev`
+works from a fresh clone): the audio worklets `public/*.worklet.js`
+(`scripts/build-worklets.mjs`) and the tour's 3D stage
+`public/landing/ad/piano-stage.js` (`scripts/build-tour-stage.mjs`). The start
+stage's guitar and sakura scenes live in `src/landing/meadow/`.
 
 ## Node catalog (v1)
 

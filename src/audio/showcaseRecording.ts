@@ -24,8 +24,9 @@
 import type { RunEvent } from '@theclearsky/react-blender-nodes';
 import type { TimelineTransport } from '@theclearsky/react-blender-nodes-timeline';
 import { startOfflineAudio } from './bootstrap';
+import type * as Tone from 'tone';
 import {
-  arePreviewsPaused,
+  forcePreviewsRunning,
   getLiveTaps,
   replaceTapAnalyser,
   setPreviewsPaused,
@@ -48,6 +49,7 @@ import {
   getTimelineRegistry,
   getTimelineStore,
   installPlaybackTransport,
+  SCHEDULE_HEADROOM_SECONDS,
 } from '../timeline/timelineSystem';
 import { createPlaybackTransport } from '../timeline/playbackTransport';
 
@@ -56,8 +58,11 @@ import { createPlaybackTransport } from '../timeline/playbackTransport';
 const LOOP_SECONDS = 4;
 /** Rendered first and NOT replayed: oscillators and reverbs start from
  *  silence, and a loop that opened on that silence would flash flat each
- *  pass. Half a second lets the attacks settle and the tails start. */
-const PRE_ROLL_SECONDS = 0.5;
+ *  pass. Half a second lets the attacks settle and the tails start — and it
+ *  always outlasts the transport's start headroom (the playhead holds still
+ *  that long after `play()`), so the replayed loop never opens on a held
+ *  playhead. Frame 0 shows the score at `startAt + headroom`. */
+const PRE_ROLL_SECONDS = Math.max(0.5, SCHEDULE_HEADROOM_SECONDS + 0.25);
 /** Frames per second recorded (the painters run at the display rate and
  *  show each frame for the time it covers). */
 const FRAME_RATE = 30;
@@ -65,8 +70,12 @@ const FRAME_RATE = 30;
 const MIN_FRAME_RATE = 12;
 /** Hard bound on the recorded frames of one showcase. */
 const MAX_RECORDING_BYTES = 8 * 1024 * 1024;
-/** A run that has not ended by then is not going to. */
-const RUN_TIMEOUT_MS = 20000;
+/** A safety net only: a run always ends with its own event (completed,
+ *  aborted or reset), and a slow phone booting several frames at once can
+ *  take well over 20 s to get there. */
+const RUN_TIMEOUT_MS = 90000;
+/** The whole render (every suspend is a main-thread round trip). */
+const RENDER_TIMEOUT_MS = 90000;
 
 type RecorderDeps = {
   /** Where the score starts playing, in seconds (default 0). */
@@ -94,26 +103,65 @@ type RecordingStats = {
 
 // ── Run completion (fed by the App's `onRunEvent`) ──
 
-let runWaiters: Array<(completed: boolean) => void> = [];
+/** Waiting for one run to end: the first run that starts after `runToEnd`
+ *  is THE run (its id comes from its own `run:started`), and only that run's
+ *  terminal event settles the wait — a stale event of an older run does not. */
+type RunWaiter = { runId: number | null; settle(completed: boolean): void };
+let runWaiter: RunWaiter | null = null;
 
 /** The App forwards its runner events here (showcase mode only). */
 function noteShowcaseRunEvent(event: RunEvent): void {
-  if (event.kind === 'run:started') return;
-  const waiters = runWaiters;
-  runWaiters = [];
-  for (const resolve of waiters) resolve(event.kind === 'run:completed');
+  const waiter = runWaiter;
+  if (!waiter) return;
+  if (event.kind === 'run:started') {
+    waiter.runId ??= event.runId;
+    return;
+  }
+  if (waiter.runId === null) return;
+  // A reset ends whatever run is going (it carries no run id).
+  if (event.kind !== 'run:reset' && event.runId !== waiter.runId) return;
+  runWaiter = null;
+  waiter.settle(event.kind === 'run:completed');
 }
 
-function waitForRunEnd(): Promise<boolean> {
+/** Starts a run and waits for it to end. A run that never starts (the
+ *  editor gone) or never ends is given up after `RUN_TIMEOUT_MS`. */
+function runToEnd(run: () => void): Promise<boolean> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new Error('the showcase run did not end')),
-      RUN_TIMEOUT_MS,
-    );
-    runWaiters.push((completed) => {
+    const timer = window.setTimeout(() => {
+      runWaiter = null;
+      reject(new Error('the showcase run did not end'));
+    }, RUN_TIMEOUT_MS);
+    runWaiter = {
+      runId: null,
+      settle: (completed) => {
+        window.clearTimeout(timer);
+        resolve(completed);
+      },
+    };
+    try {
+      run();
+    } catch (error) {
       window.clearTimeout(timer);
-      resolve(completed);
-    });
+      runWaiter = null;
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
+function withDeadline<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(`${what} took longer than ${ms / 1000} s`)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
   });
 }
 
@@ -215,17 +263,24 @@ function reachAnalysers(
   }
 }
 
-let started = false;
+let inFlight: Promise<RecordingStats | null> | null = null;
 
 /**
  * Record the open graph and start its playback. Resolves once the recorded
- * playback is running; at once when no graph is open. One recording per page
- * (its offline context is the page's audio context from then on).
+ * playback is running; with `null` when no graph is open. Rejects when the
+ * recording failed — the previews then stay flat and the timeline stopped.
+ * One recording per page (its offline context is the page's audio context
+ * from then on): a second call gets the first call's result.
  */
-async function recordOpenGraph(deps: RecorderDeps): Promise<RecordingStats | null> {
-  if (started || !deps.hasGraph()) return null;
+function recordOpenGraph(deps: RecorderDeps): Promise<RecordingStats | null> {
+  if (inFlight) return inFlight;
+  if (!deps.hasGraph()) return Promise.resolve(null);
+  inFlight = recordOnce(deps);
+  return inFlight;
+}
+
+async function recordOnce(deps: RecorderDeps): Promise<RecordingStats> {
   const startedAt = performance.now();
-  started = true;
 
   // Frames k = 0..frames-1 are replayed; the playhead gets one more sample
   // (at the loop's end) to interpolate the last frame. The render runs a
@@ -234,10 +289,37 @@ async function recordOpenGraph(deps: RecorderDeps): Promise<RecordingStats | nul
   const context = await startOfflineAudio(renderSeconds);
   // The transport and driver registry bind to the offline context.
   const transport = ensureTimelineRuntime();
+  try {
+    return await recordWith(deps, context, transport, startedAt);
+  } catch (error) {
+    // Every reader agrees on "stopped": a transport left playing on the
+    // finished offline context would hold its playhead and keep its timer.
+    try {
+      transport.stop();
+    } catch {
+      // best-effort
+    }
+    const stopped = createPlaybackTransport({
+      track: null,
+      clock: createLoopClock(LOOP_SECONDS),
+      getDurationSec: () => getTimelineStore().getDocument().durationSec,
+    });
+    installPlaybackTransport(stopped);
+    deps.showTransport(stopped);
+    (window as Window & { __showcaseRecording?: unknown }).__showcaseRecording = {
+      failed: error instanceof Error ? error.message : String(error),
+    };
+    throw error;
+  }
+}
 
-  const ended = waitForRunEnd();
-  deps.run();
-  const completed = await ended;
+async function recordWith(
+  deps: RecorderDeps,
+  context: Tone.OfflineContext,
+  transport: TimelineTransport,
+  startedAt: number,
+): Promise<RecordingStats> {
+  const completed = await runToEnd(deps.run);
   if (!completed) throw new Error('the showcase run did not complete');
 
   // A score plays while it records — as after "Run, then ▶" in the app.
@@ -248,8 +330,15 @@ async function recordOpenGraph(deps: RecorderDeps): Promise<RecordingStats | nul
   }
   // Both settle here, before the render: the previews' taps, and any
   // coalesced transport flush (one frame + 40 ms) — a flush landing MID-render
-  // would cancel and rewrite automation at an arbitrary render time.
-  await settleTaps();
+  // would cancel and rewrite automation at an arbitrary render time. The
+  // painters acquire the taps, so they run now even in a frame scrolled off
+  // screen (which otherwise pauses them).
+  const releasePainters = forcePreviewsRunning();
+  try {
+    await settleTaps();
+  } finally {
+    releasePainters();
+  }
 
   const plans = [...getLiveTaps()].map(([nodeId, tap]) => planTap(nodeId, tap));
   const budget = planFrameBudget(
@@ -287,28 +376,39 @@ async function recordOpenGraph(deps: RecorderDeps): Promise<RecordingStats | nul
       recorded.map((plan) => plan.tap.analyser),
     );
     const native = nativeOfflineContext(context.rawContext);
+    // Tone's own worklet effects (Bit Crusher, Freeverb…) connect once their
+    // module has loaded; Tone's `render()` waits for that, and so must this.
+    // (Public in Tone's JS; its typings mark it protected.)
+    await (context as unknown as { workletsAreReady(): Promise<void> }).workletsAreReady();
     for (let frame = 0; frame <= frames; frame++) {
       const at = PRE_ROLL_SECONDS + frame / frameRate;
       void native.suspend(at).then(() => {
-        if (frame < frames) {
-          for (const plan of recorded) {
-            writers.get(plan.nodeId)?.push(plan.tap.analyser.getValue());
+        // Resumed whatever happens while sampling: a render left suspended
+        // would never finish.
+        try {
+          if (frame < frames) {
+            for (const plan of recorded) {
+              writers.get(plan.nodeId)?.push(plan.tap.analyser.getValue());
+            }
           }
+          playheads[frame] = transport.getPlayheadTime();
+        } finally {
+          native.resume().catch((error: unknown) => console.warn('[showcase] the render did not resume', error));
         }
-        playheads[frame] = transport.getPlayheadTime();
-        void native.resume();
       }, (error: unknown) => console.warn('[showcase] a frame was not sampled', error));
     }
     // Every suspend is a round trip through the main thread; painting ~20
     // previews meanwhile (of a graph not yet showing anything) only delays it.
-    const wasPaused = arePreviewsPaused();
-    setPreviewsPaused(true);
+    setPreviewsPaused(true, 'recording');
     const renderStartedAt = performance.now();
     try {
-      await (context.rawContext as unknown as { startRendering(): Promise<unknown> })
-        .startRendering();
+      await withDeadline(
+        (context.rawContext as unknown as { startRendering(): Promise<unknown> }).startRendering(),
+        RENDER_TIMEOUT_MS,
+        'the offline render',
+      );
     } finally {
-      setPreviewsPaused(wasPaused);
+      setPreviewsPaused(false, 'recording');
     }
     renderMs = performance.now() - renderStartedAt;
   }
