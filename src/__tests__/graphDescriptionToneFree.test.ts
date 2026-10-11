@@ -1,12 +1,15 @@
 /**
  * Describing a graph must not load the audio engine.
  *
- * The landing page's live showcases build demo graphs with
- * `buildProbeGraphState` and need only node TYPES and graph STATE. Measured
- * 2026-10-09: one Tone import in `effectTable.ts` (its effect factories)
- * pulled all of Tone (183 modules) through `nodeTypes.ts` → `nodeCatalog.ts`
- * → `probeGraphs.ts` into every showcase frame, and each frame created an
- * AudioContext and logged "AudioContext was not allowed to start".
+ * Building a demo graph (`buildProbeGraphState`, the Demos menu, the Welcome
+ * page's demos) needs only node TYPES and graph STATE. Measured 2026-10-09:
+ * one Tone import in `effectTable.ts` (its effect factories) pulled all of
+ * Tone (183 modules) through `nodeTypes.ts` → `nodeCatalog.ts` →
+ * `probeGraphs.ts` into everything that described a graph, and each such
+ * page created an AudioContext it never used.
+ *
+ * Only STATIC imports are caught: an `import('tone')` inside a function the
+ * test does not call slips through.
  *
  * Here `tone` THROWS on import, so any graph-description module that grows a
  * Tone import again — directly or through any depth of re-exports — fails
@@ -34,6 +37,15 @@ describe('graph descriptions are Tone-free', () => {
       '../soundDefinitions/demoState'
     );
     expect(initialSoundState.nodes.length).toBeGreaterThan(0);
+  });
+
+  it('the demo catalogs and the Welcome demos load without Tone', async () => {
+    const { allDemoCategories } = await import('../soundDefinitions/demoCatalog');
+    const { instrumentDemoBuilders } = await import('../soundDefinitions/instrumentDemos');
+    const { WELCOME_DEMOS } = await import('../components/welcomeDemos');
+    expect(allDemoCategories.length).toBeGreaterThan(0);
+    expect(Object.keys(instrumentDemoBuilders).length).toBeGreaterThan(0);
+    expect(WELCOME_DEMOS.length).toBeGreaterThan(0);
   });
 
   it('showcase demo graphs build without Tone', async () => {

@@ -327,7 +327,7 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
   renderer.shadowMap.needsUpdate = true;
   const envScene = new THREE.Scene();
   envScene.add(makeSky({ ...SHINKAI_SKY, zenith: new THREE.Color(0x0d4fb8), horizon: new THREE.Color(0xb2dcec) }, sunDir, 0.3).mesh);
-  const environment = envFromScene(renderer, envScene, 0.05);
+  let environment = envFromScene(renderer, envScene, 0.05);
   scene.environment = environment;
   scene.environmentIntensity = 0.7;
   // Lighter textures: gtr-guitar paints 2048-px canvases for close-up
@@ -700,15 +700,23 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
    *  a scene stopped by its render gate carries on where it stopped. */
   let elapsed = 0;
   const MIN_FRAME_MS = 1000 / 61;
+  /** An animation frame was skipped by the cap since the last render. */
+  let capped = false;
   const frame = () => {
     const now = performance.now();
-    if (now - previous < MIN_FRAME_MS) return;
+    if (now - previous < MIN_FRAME_MS) {
+      // The browser keeps up and the cap holds this frame back: the next
+      // interval is the cap's, not slowness (the quality ladder is told).
+      capped = true;
+      return;
+    }
     // Real elapsed time (capped at 0.25 s): a stalled GPU slows the frame
     // rate, not the leaves, motes and moves.
     const dt = Math.min(0.25, (now - previous) / 1000);
     previous = now;
     elapsed += dt;
-    adaptive.frame(now);
+    adaptive.frame(now, capped);
+    capped = false;
     step(elapsed, dt);
   };
   // Reduced motion: one still frame whenever something changes.
@@ -717,22 +725,46 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
   // The loop runs only while the render gate is open: tab visible and the
   // canvas in the screen's view (src/landing/renderGate.ts; the debug
   // `stop()` closes it as the owner). Reopening restarts the frame clock one
-  // frame back, so the scene carries on where it stopped.
+  // frame back, so the scene carries on where it stopped; the gap is not a
+  // slow frame either, and the quality ladder warms up again.
   let looping = false;
   const syncLoop = () => {
     const run = !options.reducedMotion && gate.isOpen();
     if (run === looping) return;
     looping = run;
-    if (run) previous = performance.now() - 1000 / 60;
+    if (run) {
+      previous = performance.now() - 1000 / 60;
+      adaptive.reset();
+      capped = false;
+    }
     renderer.setAnimationLoop(run ? frame : null);
   };
   const gate = createRenderGate(canvas, syncLoop);
   syncLoop();
+  // A lost WebGL context (a phone under memory pressure, a GPU reset) comes
+  // back with every render target empty. three.js uploads the geometry and
+  // textures again by itself; what was drawn only once is redrawn here: the
+  // sun's shadow map and the PMREM environment. The loop draws the rest.
+  const onContextLost = () => console.warn('[meadow] the guitar scene lost its WebGL context');
+  const onContextRestored = () => {
+    console.warn('[meadow] the guitar scene got its WebGL context back; redrawing its shadow and environment');
+    renderer.shadowMap.needsUpdate = true;
+    environment.dispose();
+    environment = envFromScene(renderer, envScene, 0.05);
+    scene.environment = environment;
+    if (options.reducedMotion) still();
+  };
+  canvas.addEventListener('webglcontextlost', onContextLost);
+  canvas.addEventListener('webglcontextrestored', onContextRestored);
 
   return {
     resize(width, height) {
       world.resize(width, height);
+      // A resize clears the canvas. With the loop stopped (off screen, a
+      // hidden tab), one frame is drawn now, so nobody scrolls back into a
+      // blank canvas.
       if (options.reducedMotion) still();
+      else if (!looping) step(elapsed, 0);
     },
     /** Draw one frame now, outside the loop's frame cap. The landing calls
      *  it after `resize`, behind its black: a fresh or resized canvas is
@@ -795,6 +827,9 @@ export function createGuitarScene(canvas: HTMLCanvasElement, options: SceneOptio
     currentMove: () => `${MOVES.find((m) => m.id === move)?.label ?? move}${forcedMove ? '' : ' (random)'}`,
     quality: () => `${tier.tier}${adaptive.label()}`,
     dispose() {
+      // First: the context is given up on purpose below, which is no loss.
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
       gate.dispose();
       renderer.setAnimationLoop(null);
       rig.dispose();

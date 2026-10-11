@@ -5,12 +5,9 @@ import type { LiveLoader } from './LiveSlot';
 /*
  * What the landing page's live slots load. The app components themselves run
  * inside showcase frames (`FrameLive` → `showcase.html`), so the landing page
- * downloads none of the editor; the tour player is its own small chunk.
+ * downloads none of the editor. (The tour is a video: `site/TourPlayer`.)
  */
 
 const loadFrame: LiveLoader<{ query: FrameQuery }> = () => Promise.resolve(FrameLive);
 
-const loadTour: LiveLoader<Record<string, never>> = () =>
-  import('../site/TourPlayer').then((module) => module.TourPlayer);
-
-export { loadFrame, loadTour };
+export { loadFrame };

@@ -230,16 +230,24 @@ export function createSakuraScene(canvas: HTMLCanvasElement, options: SceneOptio
    *  a scene stopped by its render gate carries on where it stopped. */
   let elapsed = 0;
   const MIN_FRAME_MS = 1000 / 61;
+  /** An animation frame was skipped by the cap since the last render. */
+  let capped = false;
   const frame = () => {
     const now = performance.now();
-    if (now - previous < MIN_FRAME_MS) return;
+    if (now - previous < MIN_FRAME_MS) {
+      // The browser keeps up and the cap holds this frame back: the next
+      // interval is the cap's, not slowness (the quality ladder is told).
+      capped = true;
+      return;
+    }
     // Real elapsed time (capped at 0.25 s): a stalled GPU slows the frame
     // rate, not the petals and bursts (with a 50 ms cap a 2 fps stall froze
     // them inside the crown).
     const dt = Math.min(0.25, (now - previous) / 1000);
     previous = now;
     elapsed += dt;
-    adaptive.frame(now);
+    adaptive.frame(now, capped);
+    capped = false;
     step(elapsed, dt);
   };
   const still = () => step(clock.t || 2.0, 0);
@@ -247,22 +255,42 @@ export function createSakuraScene(canvas: HTMLCanvasElement, options: SceneOptio
   // The loop runs only while the render gate is open: tab visible and the
   // canvas in the screen's view (src/landing/renderGate.ts; the debug
   // `stop()` closes it as the owner). Reopening restarts the frame clock one
-  // frame back, so the scene carries on where it stopped.
+  // frame back, so the scene carries on where it stopped; the gap is not a
+  // slow frame either, and the quality ladder warms up again.
   let looping = false;
   const syncLoop = () => {
     const run = !options.reducedMotion && gate.isOpen();
     if (run === looping) return;
     looping = run;
-    if (run) previous = performance.now() - 1000 / 60;
+    if (run) {
+      previous = performance.now() - 1000 / 60;
+      adaptive.reset();
+      capped = false;
+    }
     renderer.setAnimationLoop(run ? frame : null);
   };
   const gate = createRenderGate(canvas, syncLoop);
   syncLoop();
+  // A lost WebGL context comes back with every render target empty. three.js
+  // uploads the geometry and textures again by itself, and this scene draws
+  // everything (its shadow field and stamps too) every frame, so the next
+  // frame is whole again. Logged, as every failure is.
+  const onContextLost = () => console.warn('[meadow] the sakura scene lost its WebGL context');
+  const onContextRestored = () => {
+    console.warn('[meadow] the sakura scene got its WebGL context back');
+    if (options.reducedMotion) still();
+  };
+  canvas.addEventListener('webglcontextlost', onContextLost);
+  canvas.addEventListener('webglcontextrestored', onContextRestored);
 
   return {
     resize(width, height) {
       world.resize(width, height);
+      // A resize clears the canvas. With the loop stopped (off screen, a
+      // hidden tab), one frame is drawn now, so nobody scrolls back into a
+      // blank canvas.
       if (options.reducedMotion) still();
+      else if (!looping) step(elapsed, 0);
     },
     /** Draw one frame now, outside the loop's frame cap. The landing calls
      *  it after `resize`, behind its black: a fresh or resized canvas is
@@ -319,6 +347,9 @@ export function createSakuraScene(canvas: HTMLCanvasElement, options: SceneOptio
     },
     quality: () => `${tier.tier}${adaptive.label()}`,
     dispose() {
+      // First: the context is given up on purpose below, which is no loss.
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
       gate.dispose();
       renderer.setAnimationLoop(null);
       rig.dispose();

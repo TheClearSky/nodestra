@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createStageScene } from '../landing/stageScene';
-import { loadFrame, loadTour } from '../showcase/loaders';
+import { loadFrame } from '../showcase/loaders';
 import { LiveSlot } from '../showcase/LiveSlot';
-import { isConstrainedDevice } from '../showcase/liveScheduler';
 import { ShowcasePoster } from '../showcase/ShowcasePoster';
+import { TourPlayer } from './TourPlayer';
 import {
   FEATURES,
   GOLD,
@@ -58,9 +58,24 @@ function useImpactOnScrollDown(ref: React.RefObject<HTMLElement | null>, reduced
   }, [ref, reduced]);
 }
 
+/** Marks the element `data-offscreen` while it is out of the screen's view:
+ *  the page's CSS pauses the card animations inside it (`animation-play-state`),
+ *  so nothing off screen keeps the page producing frames. */
+function usePauseOffscreen(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current; if (!el) return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[entries.length - 1].isIntersecting) delete el.dataset.offscreen; else el.dataset.offscreen = '';
+    });
+    io.observe(el);
+    return () => { io.disconnect(); delete el.dataset.offscreen; };
+  }, [ref]);
+}
+
 function ImpactSection({ children, reduced, ...rest }: React.HTMLAttributes<HTMLElement> & { reduced: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useImpactOnScrollDown(ref, reduced);
+  usePauseOffscreen(ref);
   return (
     <section {...rest}>
       <div ref={ref}>{children}</div>
@@ -69,19 +84,33 @@ function ImpactSection({ children, reduced, ...rest }: React.HTMLAttributes<HTML
 }
 
 function StageHero({ reduced }: { reduced: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLElement>(null);
   const [steering, setSteering] = useState(false);
 
   useEffect(() => {
-    const canvas = canvasRef.current, box = boxRef.current; if (!canvas || !box) return undefined;
-    // idleMotion 3: while nobody steers, the stage turns and pans on its own.
-    const stage = createStageScene(canvas, { reducedMotion: reduced, idleMotion: 3 });
+    const host = hostRef.current, box = boxRef.current; if (!host || !box) return undefined;
+    // A canvas per stage: the stage gives its WebGL context up for good when
+    // it is disposed, and a new stage is made when reduced motion toggles
+    // (and twice in development, under StrictMode).
+    const canvas = document.createElement('canvas');
+    canvas.className = 'absolute inset-0 h-full w-full';
+    host.appendChild(canvas);
+    let stage: ReturnType<typeof createStageScene>;
+    try {
+      // idleMotion 3: while nobody steers, the stage turns and pans on its own.
+      stage = createStageScene(canvas, { reducedMotion: reduced, idleMotion: 3 });
+    } catch (error) {
+      // No WebGL: the hero stays black behind its words and buttons.
+      console.warn('[landing] no WebGL for the hero stage', error);
+      canvas.remove();
+      return undefined;
+    }
     const ro = new ResizeObserver(([e]) => stage.resize(e.contentRect.width, e.contentRect.height));
     ro.observe(box);
     // Scrolled away, the stage stops drawing on its own (its render gate,
     // `landing/renderGate.ts`): nothing to do here.
-    return () => { ro.disconnect(); stage.dispose(); };
+    return () => { ro.disconnect(); stage.dispose(); canvas.remove(); };
   }, [reduced]);
 
   // Steering ends with Escape, or as soon as the hero scrolls out of view.
@@ -95,9 +124,10 @@ function StageHero({ reduced }: { reduced: boolean }) {
   }, [steering]);
 
   return (
-    <section ref={boxRef} id='top' aria-labelledby='hero-title' className='relative h-[100vh] min-h-[620px] overflow-hidden bg-black'>
-      {/* Until "Rotate the stage" is pressed, the canvas takes no input: the wheel and touch scroll the PAGE. */}
-      <canvas ref={canvasRef} className={`absolute inset-0 h-full w-full ${steering ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden='true' />
+    <section ref={boxRef} id='top' aria-labelledby='hero-title' className='s5hero relative min-h-[620px] overflow-hidden bg-black'>
+      {/* Until "Rotate the stage" is pressed, the canvas takes no input: the wheel and touch scroll the PAGE.
+          The canvas is made by the effect above, inside this box, and inherits its pointer-events. */}
+      <div ref={hostRef} className={`absolute inset-0 ${steering ? 'pointer-events-auto' : 'pointer-events-none'}`} aria-hidden='true' />
       <Embers reduced={reduced} density={30} />
       <div aria-hidden='true' className='pointer-events-none absolute inset-0' style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.75), transparent 35%, transparent 60%, rgba(0,0,0,0.85))', opacity: steering ? 0.35 : 1, transition: 'opacity .5s' }} />
       <div className='pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center gap-4 px-4 pt-14 text-center transition-opacity duration-500' style={{ opacity: steering ? 0 : 1 }}>
@@ -172,7 +202,7 @@ function PlayingCard({ shot, index, reduced }: { shot: (typeof SCREENS)[number];
         style={{ transform: rest, transformStyle: 'preserve-3d', animationDelay: `${index * -1.3}s` }}
       >
         <div className='relative overflow-hidden rounded-[16.5px] bg-[#0f0b09]'>
-          <LiveSlot load={loadFrame} props={{ query: shot.showcase }} poster={<ShowcasePoster title={shot.title} />} label={shot.title} crop={shot.crop} />
+          <LiveSlot load={loadFrame} props={{ query: shot.showcase }} poster={<ShowcasePoster title={shot.title} />} label={shot.title} crop={shot.crop} tryItCorner={shot.tryItCorner} />
           <p className='px-4 py-3 text-[14px] text-[#f4ead8]/90'>{shot.caption}</p>
           {/* gloss: a sheen that sweeps across, and follows the pointer on hover */}
           <span aria-hidden='true' className='s5sheen pointer-events-none absolute inset-0' style={{ animationDelay: `${index * 0.9}s` }} />
@@ -186,6 +216,9 @@ function PlayingCard({ shot, index, reduced }: { shot: (typeof SCREENS)[number];
 
 const PAGE_CSS = `
 ${STAGE_CSS}
+/* The hero fills the screen as it is first seen: the small viewport (the phone's URL bar shown), so its
+   buttons are not under the toolbar; 100vh where svh is unknown. */
+.s5hero { height: 100vh; height: 100svh; }
 @keyframes s5Ping { from { transform: scale(1); opacity: .8 } to { transform: scale(1.35, 1.6); opacity: 0 } }
 @keyframes s5Turn { 0%,100% { transform: rotate(-25deg) } 50% { transform: rotate(25deg) } }
 /* The card: a thin gold-rimmed playing card — rim light, a sliver of edge thickness, a soft lift. */
@@ -216,22 +249,9 @@ ${STAGE_CSS}
 }
 @keyframes s5Sheen { 0%,55% { background-position: 130% 0 } 85%,100% { background-position: -40% 0 } }
 @media (prefers-reduced-motion: reduce) { .s5card, .s5sheen { animation: none } }
+/* Off screen (see usePauseOffscreen), every card animation holds still. */
+[data-offscreen] .s5card, [data-offscreen] .s5sheen, [data-offscreen] .e5anim { animation-play-state: paused }
 `;
-
-/** The tour is the heaviest thing on the page (a second three.js stage and
- *  ten app screens): on phones, tablets and low-end machines it waits for a
- *  tap instead of starting as it scrolls in (measured ~2 fps while it played
- *  on an emulated phone, CPU /4). */
-const TOUR_WAITS_FOR_TAP = isConstrainedDevice() || window.matchMedia('(pointer: coarse)').matches;
-
-/** The tour's place-holder until it scrolls near: the stage, dark, waiting. */
-function TourPoster() {
-  return (
-    <div className='grid h-full w-full place-items-center bg-black'>
-      <p className='font-serif text-[13px] tracking-[0.4em] uppercase' style={{ color: GOLD }}>The tour</p>
-    </div>
-  );
-}
 
 function LandingPage() {
   usePageTitle('Nodestra — build instruments and songs from nodes');
@@ -245,7 +265,7 @@ function LandingPage() {
         <StageHero reduced={reduced} />
         <ImpactSection id='tour' reduced={reduced} className='relative mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6'>
           <Proscenium>
-            <LiveSlot load={loadTour} props={{}} fit='fill' tryIt={false} nearMargin='0px' farMargin='50% 0px' waitForTap={TOUR_WAITS_FOR_TAP} tapLabel='▶ Play the tour' poster={<TourPoster />} label='Nodestra — an animated tour of the app' />
+            <TourPlayer reduced={reduced} />
           </Proscenium>
         </ImpactSection>
         <ImpactSection aria-labelledby='screens-title' id='screens' reduced={reduced} className='relative scroll-mt-20 border-t border-[#e9d3a8]/10'>

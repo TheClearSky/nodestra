@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createRenderGate } from '../landing/renderGate';
 import { FEATURES, GOLD, OpenAppButton } from './shared';
 
 /*
@@ -8,6 +9,21 @@ import { FEATURES, GOLD, OpenAppButton } from './shared';
  * proscenium round the tour, smouldering feature cards, and red velvet
  * curtains that part on the last call to action.
  */
+
+/** One ember: where it is, its depth (0 far … 1 near), sprite, sway phase,
+ *  and when it was born (s on the embers' own clock; -1 = not yet). */
+type Ember = { x: number; y: number; z: number; s: number; ph: number; born: number };
+
+/**
+ * Moves an ember by `dt` seconds at time `t`. The speeds are per second, so
+ * the embers rise and drift the same at 30, 60 or 144 frames a second (the
+ * speeds are the old per-frame steps at 60 fps).
+ */
+function moveEmber(p: Ember, t: number, dt: number, w: number) {
+  const k = dt * 60;
+  const vy = (6.5 + 4.5 * p.z) * 24 * 0.016, vx = (1.1 + 0.012 * (p.x - w / 2) * 0.1) * 0.4;
+  p.y -= vy * k; p.x += (vx + Math.sin(t * 1.3 + p.ph) * 0.4) * k;
+}
 
 const EMBER_COLS = ['#BC2231', '#BC2231', '#BC2231', '#BC2231', '#BC2231', '#BC2231', '#BC2231', '#BC2231', '#B91871', '#B91871', '#B91871', '#CA4928'];
 
@@ -25,19 +41,22 @@ function Embers({ reduced, density = 90 }: { reduced: boolean; density?: number 
       gr.addColorStop(0, col); gr.addColorStop(0.3, col + 'f2'); gr.addColorStop(0.55, col + '80'); gr.addColorStop(1, col + '00');
       sg.fillStyle = gr; sg.fillRect(0, 0, 64, 64); return c;
     });
-    const P = Array.from({ length: density }, () => ({ x: 0, y: 0, z: 0, s: 0, ph: 0, born: -1 }));
-    const spawn = (p: (typeof P)[number], t: number) => { p.x = Math.random() * w; p.y = h * (0.5 + Math.random() * 0.6); p.z = Math.random(); p.s = Math.floor(Math.random() * sprites.length); p.ph = Math.random() * 6.28; p.born = t; };
-    const t0 = performance.now();
+    const P: Ember[] = Array.from({ length: density }, () => ({ x: 0, y: 0, z: 0, s: 0, ph: 0, born: -1 }));
+    const spawn = (p: Ember, t: number) => { p.x = Math.random() * w; p.y = h * (0.5 + Math.random() * 0.6); p.z = Math.random(); p.s = Math.floor(Math.random() * sprites.length); p.ph = Math.random() * 6.28; p.born = t; };
+    // The embers' own clock (s): it runs only while they are drawn, so they
+    // carry on where they stopped. `last` is the previous frame's rAF time.
+    let t = 0, last = -1;
     const tick = (now: number) => {
-      const t = (now - t0) / 1000;
+      // Real time between frames (capped: a stalled tab does not fling them).
+      const dt = last < 0 ? 1 / 60 : Math.min(0.1, (now - last) / 1000);
+      last = now; t += dt;
       g.clearRect(0, 0, w, h);
       g.globalCompositeOperation = 'lighter';
       const live = Math.min(density, 3 + Math.floor(t / 0.5 * 87));
       P.forEach((p, i) => {
         if (i >= live) return;
         if (p.born < 0 || p.y < -40) spawn(p, t);
-        const vy = (6.5 + 4.5 * p.z) * 24 * 0.016, vx = (1.1 + 0.012 * (p.x - w / 2) * 0.1) * 0.4;
-        p.y -= vy; p.x += vx + Math.sin(t * 1.3 + p.ph) * 0.4;
+        moveEmber(p, t, dt, w);
         const r = (8 + p.z * 20) * 0.8, a = Math.min(1, (t - p.born) * 2) * (0.35 + 0.65 * p.z) * Math.min(1, (p.y + 40) / (h * 0.3));
         g.globalAlpha = Math.max(0, a);
         g.drawImage(sprites[p.s], p.x - r, p.y - r, r * 2, r * 2);
@@ -45,8 +64,13 @@ function Embers({ reduced, density = 90 }: { reduced: boolean; density?: number 
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+    // Drawn only while the canvas is in the screen's view and the tab is
+    // visible (the same render gate as the 3D scenes).
+    const start = () => { if (!raf) { last = -1; raf = requestAnimationFrame(tick); } };
+    const stop = () => { cancelAnimationFrame(raf); raf = 0; };
+    const gate = createRenderGate(cv, (open) => (open ? start() : stop()));
+    if (gate.isOpen()) start();
+    return () => { gate.dispose(); stop(); ro.disconnect(); };
   }, [reduced, density]);
   return <canvas ref={ref} className='pointer-events-none absolute inset-0 h-full w-full' aria-hidden='true' />;
 }
@@ -101,12 +125,13 @@ function Proscenium({ children }: { children: React.ReactNode }) {
 function EmberCard({ f }: { f: (typeof FEATURES)[number] }) {
   return (
     <li className='group relative overflow-hidden rounded-xl p-[1.5px]' style={{ background: 'linear-gradient(140deg, rgba(233,211,168,0.18), rgba(255,255,255,0.04))' }}>
-      <span aria-hidden='true' className='absolute inset-[-40%] opacity-0 transition-opacity duration-500 group-hover:opacity-100' style={{ background: 'conic-gradient(from 0deg, #BC2231, #CA4928, #f3cf8a, #B91871, #BC2231)', animation: 'eSpin 3s linear infinite' }} />
+      {/* The spin runs only while hovered (it is invisible otherwise), and not at all with reduced motion. */}
+      <span aria-hidden='true' className='e5anim absolute inset-[-40%] opacity-0 transition-opacity duration-500 group-hover:opacity-100 motion-safe:group-hover:[animation:eSpin_3s_linear_infinite]' style={{ background: 'conic-gradient(from 0deg, #BC2231, #CA4928, #f3cf8a, #B91871, #BC2231)' }} />
       <div className='relative flex h-full flex-col gap-2 rounded-[11px] bg-[#140c0b] p-5'>
         <h3 className='font-serif text-[18px]' style={{ color: '#f4ead8' }}>{f.title}</h3>
         <p className='text-[14px] leading-relaxed text-[#d8c7a8]/80'>{f.text}</p>
         {Array.from({ length: 7 }, (_, i) => (
-          <span key={i} aria-hidden='true' className='pointer-events-none absolute bottom-0 h-2 w-2 rounded-full opacity-0 group-hover:[animation:eRise_1.8s_ease-out_infinite]' style={{ left: `${10 + i * 13}%`, background: EMBER_COLS[i * 2 % EMBER_COLS.length], boxShadow: `0 0 10px ${EMBER_COLS[i * 2 % EMBER_COLS.length]}`, animationDelay: `${i * 0.23}s` }} />
+          <span key={i} aria-hidden='true' className='e5anim pointer-events-none absolute bottom-0 h-2 w-2 rounded-full opacity-0 motion-safe:group-hover:[animation:eRise_1.8s_ease-out_infinite]' style={{ left: `${10 + i * 13}%`, background: EMBER_COLS[i * 2 % EMBER_COLS.length], boxShadow: `0 0 10px ${EMBER_COLS[i * 2 % EMBER_COLS.length]}`, animationDelay: `${i * 0.23}s` }} />
         ))}
       </div>
     </li>
@@ -159,4 +184,5 @@ const STAGE_CSS = `
 @keyframes eRise { 0% { opacity:0; transform: translateY(0) scale(.6) } 20% { opacity:1 } 100% { opacity:0; transform: translateY(-120px) scale(1.2) } }
 `;
 
-export { CurtainCTA, EmberCard, Embers, ImpactFilters, Proscenium, STAGE_CSS };
+export { CurtainCTA, EmberCard, Embers, ImpactFilters, moveEmber, Proscenium, STAGE_CSS };
+export type { Ember };

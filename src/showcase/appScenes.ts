@@ -10,19 +10,7 @@ import type { ShowcaseStep } from './showcaseScript';
  * for each is the snapshot it replaces (`.claude/plans/live-landing.md`).
  */
 
-type AppSceneId =
-  | 'welcome'
-  | 'tutorial'
-  | 'effects'
-  | 'info'
-  | 'addMenu'
-  | 'insideGroup'
-  | 'groupEditor'
-  | 'timeline'
-  | 'gridFinder'
-  | 'violin';
-
-const APP_SCENE_IDS: readonly AppSceneId[] = [
+const APP_SCENE_IDS = [
   'welcome',
   'tutorial',
   'effects',
@@ -33,7 +21,13 @@ const APP_SCENE_IDS: readonly AppSceneId[] = [
   'timeline',
   'gridFinder',
   'violin',
-];
+] as const;
+
+type AppSceneId = (typeof APP_SCENE_IDS)[number];
+
+function isAppSceneId(value: string | null): value is AppSceneId {
+  return value !== null && (APP_SCENE_IDS as readonly string[]).includes(value);
+}
 
 /** Opens a demo from the toolbar's Demos menu (a new file and tab): the
  *  category row opens its submenu on hover, the demo row loads on click. */
@@ -76,29 +70,43 @@ const crunch = openDemo('Easy Effects', 'Crunch → Echo → Big Space');
 const session: ShowcaseStep[] = [dismissOffer, ...curveOrchestra, ...violin, ...wobble];
 
 const appScenes: Record<AppSceneId, readonly ShowcaseStep[]> = {
-  welcome: [],
-  tutorial: [click('button', 'Show me how'), click('button', 'Next')],
+  // Ready only once Blip's offer is on screen (it opens after the library
+  // has loaded, a moment after the app's first paint).
+  welcome: [waitVisible('button', 'Show me how')],
+  // Blip's hint ("It's the purple button…") appears 12 s into the step
+  // (`tutorials/open-piano-demo.json` timeoutMs); the approved look has it.
+  tutorial: [click('button', 'Show me how'), click('button', 'Next'), waitVisible('p, div', "It's the purple button", 20000)],
   effects: session,
-  // The ⓘ shows while the pointer is over its node; then the hint opens.
-  info: [...session, wait(400), reveal('[aria-label="About Stutter"]'), pointAt('[aria-label="About Stutter"]')],
+  // Stutter's ⓘ and its hint are opened after the recording (`afterRecording`).
+  info: session,
   addMenu: [...session, ...crunch, contextMenu(0.545, 0.1), hover('Add Node'), wait(300), hover('Easy Effects')],
   insideGroup: [...session, ...crunch, ...openEchoGroup],
-  groupEditor: [...session, ...crunch, ...openEchoGroup, editOpenGroup],
+  groupEditor: [...session, ...crunch, ...openEchoGroup, editOpenGroup, wait(300), blurActive],
   timeline: [dismissOffer, ...curveOrchestra, openTimeline],
   gridFinder: [dismissOffer, ...curveOrchestra, openTimeline, click('button', 'find grid'), wait(300), blurActive],
   violin: [dismissOffer, ...curveOrchestra, ...violin, openTimeline],
 };
 
-/** Where each score starts playing in its recording. The playhead must sweep
- *  through the visible lanes: at the timeline's default zoom about 11 s fit, and
- *  the approved look had the playhead at x ≈ 789 (t ≈ 3.5 s at that zoom; the
- *  snapshot's view had scrolled to t = 10.96 s), so the 4 s loop starts at 1.5 s
- *  and passes that spot mid-loop. The tour's playhead highlight follows it. */
+/** Steps that run once the scene's previews are recorded (straight after the
+ *  steps above in "Try it", which records nothing). Recording re-renders the
+ *  graph's nodes, which drops a revealed ⓘ and closes its open hint. */
+const afterRecording: Partial<Record<AppSceneId, readonly ShowcaseStep[]>> = {
+  // The ⓘ shows while the pointer is over its node; then the hint opens.
+  info: [wait(400), reveal('[aria-label="About Stutter"]'), pointAt('[aria-label="About Stutter"]')],
+};
+
+/** Where each score starts playing in its recording (the recording's first
+ *  frame shows the playhead a quarter second later — the transport's start
+ *  headroom). The playhead must sweep through the visible lanes: at the
+ *  timeline's default zoom about 11 s fit, and the approved look had the
+ *  playhead at x ≈ 789 (t ≈ 3.5 s at that zoom; the snapshot's view had
+ *  scrolled to t = 10.96 s), so the 4 s loop starts near 1.75 s and passes that
+ *  spot mid-loop. The tour's playhead highlight follows it. */
 const sceneRecording: Partial<Record<AppSceneId, SceneRecordingOptions>> = {
   timeline: { startAt: 1.5 },
   gridFinder: { startAt: 1.5 },
   violin: { startAt: 1.7 },
 };
 
-export { APP_SCENE_IDS, appScenes, sceneRecording };
+export { afterRecording, APP_SCENE_IDS, appScenes, isAppSceneId, sceneRecording };
 export type { AppSceneId };

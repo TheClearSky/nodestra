@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn, type NodePreviewProps } from '@theclearsky/react-blender-nodes';
-import * as Tone from 'tone';
 import { isAudioChain } from '../../soundDefinitions/valueTypes';
 import type { TapMode } from './tapManager';
 import {
   acquireTap,
   getPreviewMode,
+  readArray,
+  readLevel,
   registerPainter,
   setPreviewMode,
 } from './tapManager';
@@ -153,7 +154,7 @@ function AudioPreview({ nodeId, nodeTypeId, live }: NodePreviewProps) {
         return;
       }
       if (storedMode === 'wave') {
-        drawWave(context, (tap.analyser as Tone.Waveform).getValue());
+        drawWave(context, readArray(tap));
       } else if (storedMode === 'audiogram') {
         const now = performance.now();
         if (now - lastAudiogramPaintRef.current < AUDIOGRAM_FRAME_MS) return;
@@ -161,11 +162,10 @@ function AudioPreview({ nodeId, nodeTypeId, live }: NodePreviewProps) {
         drawAudiogramColumn(
           canvas,
           context,
-          (tap.analyser as Tone.FFT).getValue(),
+          readArray(tap),
         );
       } else if (storedMode === 'meter') {
-        const value = (tap.analyser as Tone.Meter).getValue();
-        drawMeter(context, Array.isArray(value) ? Math.max(...value) : value);
+        drawMeter(context, readLevel(tap));
       }
     });
   }, [nodeId, isRender]);

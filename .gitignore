@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 tsconfig.tsbuildinfo
 
 # Editor directories and files
@@ -41,6 +44,7 @@ research/
 # sources under .claude/ (not in the repo), so it cannot run from a clone. Its
 # OUTPUT (src/landing/meadow/) is the product and is committed.
 scripts/sync-meadow.mjs
+scripts/sync-hell.mjs
 .pytest_cache/
 __pycache__/
 *.py[cod]

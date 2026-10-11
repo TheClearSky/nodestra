@@ -4,9 +4,9 @@ import { SignalBaseInput } from '../components/SignalBaseInput';
 import { WaveformDrawInput } from '../components/WaveformDrawInput';
 
 /*
- * The editor's parts, shared by the app (`App.tsx`) and the landing page's
- * live showcases (`src/showcase/`), so a showcase IS the app's editor — same
- * inputs, same timeline drawer — never a look-alike.
+ * The editor's parts the app hands the host (`App.tsx`): module-level, so
+ * their identities are stable across renders. (The landing page's showcases
+ * run the whole App, these included.)
  */
 
 // The curve timeline as a host BOTTOM DRAWER: the runner panel's chrome, a

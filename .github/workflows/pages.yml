@@ -1,6 +1,6 @@
 name: Deploy to GitHub Pages
 
-# The site (landing at /, the app at /app) is built and published by CI only —
+# The site (landing at /, the app at /app/) is built and published by CI only —
 # never by hand. Pushes to main deploy; pull requests build and test only.
 on:
   push:
@@ -14,9 +14,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
-    concurrency: ci-${{ github.ref }}
+    # A newer push to the same pull request supersedes its older build; main
+    # builds always finish (each one may deploy).
+    concurrency:
+      group: ci-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
     steps:
       - name: Checkout
@@ -63,6 +68,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

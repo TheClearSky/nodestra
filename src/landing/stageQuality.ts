@@ -2,7 +2,9 @@
  * Quality tiers for the piano stage (`stageScene.ts`): a startup guess from
  * cheap signals, then runtime adaptation from measured frame times. The
  * design follows the meadow scenes' `scene-quality.ts` (in the ad
- * experiments), written fresh for the stage's own costs.
+ * experiments), written fresh for the stage's own costs. The meadows now run
+ * their own rungs on this file's ladder (`createStageAdaptive`) and use its
+ * GPU probe, so the two cannot drift apart again.
  *
  * Why (2026-10-09, Deepak: "the landing page lags really hard on phone and
  * less powerful devices"): the stage drew the same frame everywhere — pixel
@@ -140,7 +142,7 @@ function pickStageTier(signals: StageSignals): StageTierGuess {
 
 /** The renderer string of the GPU a high-performance context would get —
  *  the stage asks for one, and on a dual-GPU laptop a default context may
- *  name the other GPU. */
+ *  name the other GPU. The meadow scenes ask for one too, and use this. */
 function probeGpu(): string {
   try {
     const canvas = document.createElement('canvas');
@@ -276,6 +278,10 @@ function createStageAdaptive(
   };
   return {
     frame(now, capped = false) {
+      // Nothing to adapt (a forced tier, reduced motion, a one-level ladder):
+      // nothing is recorded either, so the intervals cannot pile up for the
+      // page's life.
+      if (!options.enabled || levels < 2) return;
       if (startedAt < 0) {
         startedAt = now;
         windowStart = now;
@@ -285,7 +291,6 @@ function createStageAdaptive(
         intervals.push(capped ? Math.min(interval, 1000 / 60) : interval);
       }
       last = now;
-      if (!options.enabled || levels < 2) return;
       if (now - startedAt < WARM_UP_MS) {
         // Shader compiles and the first uploads: not the stage's pace.
         intervals.length = 0;
@@ -295,7 +300,11 @@ function createStageAdaptive(
       if (now - windowStart < WINDOW_MS) return;
       windowStart = now;
       const sorted = intervals.splice(0).sort((a, b) => a - b);
-      if (sorted.length < 4) return;
+      // A window of 1–3 frames is a device under 2 fps when every one of
+      // them was slow; that is the device the ladder most needs to help. A
+      // short window with any fast frame in it says too little: it is
+      // dropped.
+      if (sorted.length === 0 || (sorted.length < 4 && sorted[0] <= SLOW_MS)) return;
       const median = sorted[sorted.length >> 1];
       if (median > SLOW_MS) {
         slow++;
@@ -331,5 +340,5 @@ function createStageAdaptive(
   };
 }
 
-export { STAGE_TIERS, pickStageTier, detectStageTier, stageLadder, createStageAdaptive };
+export { STAGE_TIERS, isStageTier, pickStageTier, probeGpu, detectStageTier, stageLadder, createStageAdaptive };
 export type { StageTier, StageTierParams, StageSignals, StageTierGuess, StageLevel, StageAdaptive };

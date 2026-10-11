@@ -55,10 +55,21 @@ function reloadOnLinkedLibraryBuild(): Plugin {
   };
 }
 
+/** GitHub Pages serves the site under /<repo>/; the Pages workflow passes
+ *  that as BASE_PATH. Locally (dev, preview, tests) it is the root. It must
+ *  be an absolute path with a slash at each end: a relative base breaks the
+ *  router's basename and the worklet URLs under /app/, and an empty one is
+ *  relative. */
+function basePath(): string {
+  const base = process.env.BASE_PATH || '/';
+  if (!/^\/(?:.*\/)?$/.test(base)) {
+    throw new Error(`BASE_PATH must start and end with "/" (got "${base}")`);
+  }
+  return base;
+}
+
 export default defineConfig({
-  // GitHub Pages serves the site under /<repo>/; the Pages workflow passes
-  // that as BASE_PATH. Locally (dev, preview, tests) it is the root.
-  base: process.env.BASE_PATH ?? '/',
+  base: basePath(),
   // Tailwind v4 through its Vite plugin — no config file, no PostCSS file;
   // the tokens live in `src/index.css` (the host's arrangement).
   plugins: [react(), tailwindcss(), reloadOnLinkedLibraryBuild()],

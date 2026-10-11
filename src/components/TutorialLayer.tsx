@@ -275,4 +275,4 @@ function TutorialLayer({ controller, view, offer, onOfferTutorial, onOfferJustOp
   );
 }
 
-export { BlipOffer, renderInline, TutorialLayer };
+export { renderInline, TutorialLayer };

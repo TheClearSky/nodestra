@@ -235,3 +235,47 @@ describe('createStageAdaptive', () => {
     expect(adaptive.level()).toBe(0);
   });
 });
+
+describe('createStageAdaptive on the slowest devices', () => {
+  const run = (adaptive: ReturnType<typeof createStageAdaptive>, from: number, ms: number, seconds: number) => {
+    let t = from;
+    while (t < from + seconds * 1000) {
+      t += ms;
+      adaptive.frame(t);
+    }
+    return t;
+  };
+
+  it('steps down a device under 2 fps (windows of 1–3 frames, all slow)', () => {
+    const adaptive = createStageAdaptive(5, () => {}, { enabled: true });
+    let t = 0;
+    // 1.7 fps: every 2 s window holds three or four 600 ms frames.
+    for (let i = 0; i < 40; i++) {
+      t += 600;
+      adaptive.frame(t);
+    }
+    expect(adaptive.level()).toBeGreaterThan(0);
+    // 0.4 fps: a window holds one frame.
+    const slower = createStageAdaptive(5, () => {}, { enabled: true });
+    t = 0;
+    for (let i = 0; i < 20; i++) {
+      t += 2500;
+      slower.frame(t);
+    }
+    expect(slower.level()).toBeGreaterThan(0);
+  });
+
+  it('drops a short window that holds a fast frame (it says too little)', () => {
+    const adaptive = createStageAdaptive(5, () => {}, { enabled: true });
+    let t = run(adaptive, 0, 16.7, 4.1);
+    // Every 2 s window now holds exactly three frames, one of them fast:
+    // never evaluated.
+    for (let i = 0; i < 30; i++) {
+      for (const ms of [16.7, 1500, 600]) {
+        t += ms;
+        adaptive.frame(t);
+      }
+    }
+    expect(adaptive.level()).toBe(0);
+  });
+});

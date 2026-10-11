@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>E · Encore+ · Nodestra — Encore</title>
+<meta name="robots" content="noindex" />
+<title>Nodestra — tour</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%0A%20%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%2315171c%22/%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q14%2054%206.9%2045.3%22%20stroke%3D%22%232ECC71%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q18%2042%2016.2%2031.4%22%20stroke%3D%22%233498DB%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q32%2038%2032%2026%22%20stroke%3D%22%23F1C40F%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q46%2042%2047.8%2031.4%22%20stroke%3D%22%23E74C3C%22/%3E%0A%20%20%20%20%3Cpath%20d%3D%22M32%2052%20Q50%2054%2057.1%2045.3%22%20stroke%3D%22%239B59B6%22/%3E%0A%20%20%3C/g%3E%0A%20%20%3Ccircle%20cx%3D%226.9%22%20cy%3D%2245.3%22%20r%3D%224.2%22%20fill%3D%22%232ECC71%22/%3E%0A%20%20%3Ccircle%20cx%3D%2216.2%22%20cy%3D%2231.4%22%20r%3D%224.2%22%20fill%3D%22%233498DB%22/%3E%0A%20%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2226%22%20r%3D%224.2%22%20fill%3D%22%23F1C40F%22/%3E%0A%20%20%3Ccircle%20cx%3D%2247.8%22%20cy%3D%2231.4%22%20r%3D%224.2%22%20fill%3D%22%23E74C3C%22/%3E%0A%20%20%3Ccircle%20cx%3D%2257.1%22%20cy%3D%2245.3%22%20r%3D%224.2%22%20fill%3D%22%239B59B6%22/%3E%0A%20%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2252%22%20r%3D%226%22%20fill%3D%22%2315171c%22%20stroke%3D%22%23eceef3%22%20stroke-width%3D%223%22/%3E%0A%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +30,6 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
   radial-gradient(520px 420px at 62% 18%,rgba(52,152,219,.05),transparent 70%);will-change:transform}
 #world{position:absolute;inset:0;perspective:1400px;perspective-origin:800px 500px}
 .panel{position:absolute;left:0;top:0;width:1440px;height:900px;transform-origin:0 0;border-radius:14px;overflow:hidden;background:#151515;box-shadow:0 40px 120px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.08);will-change:transform,opacity,filter;display:block;visibility:hidden}
-.panel img{display:block;width:1440px;height:900px;-webkit-user-drag:none}
 /* ---- live stage (the app's own three.js scene + its overlays, 1:1 from StageLanding.tsx) ---- */
 .livehost{position:relative;width:1440px;height:900px;background:#030102;overflow:hidden;font-family:system-ui,sans-serif}
 .livehost canvas{position:absolute;inset:0;width:1440px;height:900px;display:block}
@@ -54,7 +54,17 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
 .lv-keys .w.down{background:#f3cf8a;color:#000}
 .lv-keys .b.down{background:#c9973f;color:#000}
 
-.panel iframe{border:0;display:block;width:1440px;height:900px;pointer-events:none;background:#1e1e1e;color-scheme:dark}
+/* A live screen stays invisible over the panel's dark backdrop until its frame reports ready:
+   the visitor never sees the app booting or its setup clicks. */
+.panel iframe{border:0;display:block;width:1440px;height:900px;pointer-events:none;background:#1e1e1e;color-scheme:dark;opacity:0;transition:opacity .3s ease}
+.panel iframe.ready{opacity:1}
+/* Buffering: the loader's node mark, small and gold, in a corner (the embedded tour shows TourPlayer's own cue). */
+#buf{position:absolute;right:26px;bottom:22px;width:34px;height:34px;color:var(--gold);opacity:0;pointer-events:none;transition:opacity .2s ease}
+#buf.on{opacity:.9;transition:opacity .3s ease .25s}
+#buf circle.n{animation:lp 1.6s ease-in-out infinite}
+#buf circle.n:nth-of-type(2){animation-delay:.15s}#buf circle.n:nth-of-type(3){animation-delay:.3s}
+#buf circle.n:nth-of-type(4){animation-delay:.45s}#buf circle.n:nth-of-type(5){animation-delay:.6s}
+.embed #buf{display:none}
 #vig{inset:0;background:radial-gradient(ellipse 78% 72% at 50% 48%,transparent 52%,rgba(0,0,0,.6) 100%)}
 #fx{position:absolute;left:0;top:0;width:1600px;height:1000px;pointer-events:none}
 #scrimB{left:0;right:0;bottom:0;height:300px;background:linear-gradient(to bottom,rgba(6,6,8,0),rgba(6,6,8,.8) 62%,rgba(6,6,8,.93));opacity:0}
@@ -70,11 +80,6 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
 .g.signal{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);width:14px;height:14px}
 .g.number{clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);width:15px;height:13px}
 .g.wave{border-radius:50%}
-#logo{inset:0;opacity:0;display:none}
-#mark{position:absolute;left:680px;top:250px;width:240px;height:240px;overflow:visible;color:#ececec;filter:drop-shadow(0 0 14px rgba(255,255,255,.12))}
-#word{position:absolute;left:0;right:0;top:520px;text-align:center;font-size:104px;font-weight:300;letter-spacing:.015em;color:#f2f2f2;text-shadow:0 0 40px rgba(255,255,255,.12)}
-#word span{display:inline-block;will-change:transform,opacity,filter}
-#tag{position:absolute;left:0;right:0;top:668px;text-align:center;font-size:27px;color:#bdbdbd;letter-spacing:.01em}
 /* C's warm stage spotlight (intro + ending) */
 #beam{position:absolute;inset:0;opacity:0;pointer-events:none}
 #beam .soft{position:absolute;inset:0;filter:blur(28px)}
@@ -98,6 +103,11 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
 #finale .tag{position:absolute;left:0;right:0;top:650px;text-align:center;font-size:27px;color:#bdbdbd;letter-spacing:.01em;opacity:0;filter:blur(6px);transition:all 1.2s ease 2.2s}
 #finale.on .word,#finale.on .tag{opacity:1;transform:none;filter:none}
 .embed #bar,.embed #hud{display:none!important}
+/* `?capture`: recorded to video frame by frame (scripts/record-tour.mjs) — no loader, no fades in or out of the stage, square edges. */
+.capture #loader{display:none}.capture #stage{transition:none;border-radius:0;box-shadow:none}
+/* Panels drop will-change when recorded: with it the browser draws a panel once and scales that picture, so a
+   zoomed screen's text is an enlarged bitmap, soft. Without it every frame is drawn sharp at its zoom (slower; fine offline). */
+.capture .panel,.capture .cap{will-change:auto}
 #bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.07);pointer-events:none}
 #bar i{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,#2ECC71,#F1C40F 30%,#3498DB 55%,#E74C3C 78%,#9B59B6)}
 #bar b{position:absolute;top:0;width:1px;height:3px;background:rgba(0,0,0,.6)}
@@ -112,12 +122,12 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
 @keyframes lp{0%,100%{opacity:.35}50%{opacity:1}}
 .lbar{width:160px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
 .lbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2ECC71,#F1C40F,#3498DB,#E74C3C,#9B59B6);transition:width .3s}
-@media (prefers-reduced-motion: reduce){ #loader circle.n{animation:none;opacity:.9} }
+@media (prefers-reduced-motion: reduce){ #loader circle.n,#buf circle.n{animation:none;opacity:.9} .panel iframe{transition:none} }
 </style>
 </head>
 <body>
 <div id="frame">
-  <div id="stage" aria-label="Nodestra — animated tour. Click or press Space to pause, arrow keys to change scene." role="img">
+  <div id="stage" role="region" aria-roledescription="animated tour" aria-label="Nodestra — an animated tour of the app, playing live screens of it. Click or press Space to pause or play; the arrow keys change scene.">
     <div id="neb" class="layer"></div>
     <div id="dots2" class="layer"></div>
     <div id="dots1" class="layer"></div>
@@ -173,29 +183,20 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
       <div class="word">Nodestra</div>
       <div class="tag">Build instruments and songs from nodes — and hear every change.</div>
     </div>
-    <div id="logo" class="layer">
-      <svg id="mark" viewBox="0 0 64 64" aria-hidden="true">
-        <g fill="none" stroke-width="3" stroke-linecap="round">
-          <path class="lw" d="M32 52 Q14 54 6.9 45.3" stroke="#2ECC71"/>
-          <path class="lw" d="M32 52 Q18 42 16.2 31.4" stroke="#3498DB"/>
-          <path class="lw" d="M32 52 Q32 38 32 26" stroke="#F1C40F"/>
-          <path class="lw" d="M32 52 Q46 42 47.8 31.4" stroke="#E74C3C"/>
-          <path class="lw" d="M32 52 Q50 54 57.1 45.3" stroke="#9B59B6"/>
-        </g>
-        <circle class="ln" cx="6.9" cy="45.3" r="4.2" fill="#2ECC71"/>
-        <circle class="ln" cx="16.2" cy="31.4" r="4.2" fill="#3498DB"/>
-        <circle class="ln" cx="32" cy="26" r="4.2" fill="#F1C40F"/>
-        <circle class="ln" cx="47.8" cy="31.4" r="4.2" fill="#E74C3C"/>
-        <circle class="ln" cx="57.1" cy="45.3" r="4.2" fill="#9B59B6"/>
-        <circle id="cond" cx="32" cy="52" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
-      </svg>
-      <div id="word"></div>
-      <div id="tag">Build instruments and songs from nodes — and hear every change.</div>
-    </div>
     <div id="scrimT" class="layer"></div>
     <div id="scrimB" class="layer"></div>
     <div id="caps" class="layer" style="inset:0"></div>
     <div id="hud">Paused · click or Space to play · ← → scenes</div>
+    <svg id="buf" viewBox="0 0 64 64" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55">
+        <path d="M32 52 Q14 54 6.9 45.3"/><path d="M32 52 Q18 42 16.2 31.4"/><path d="M32 52 Q32 38 32 26"/>
+        <path d="M32 52 Q46 42 47.8 31.4"/><path d="M32 52 Q50 54 57.1 45.3"/>
+      </g>
+      <circle class="n" cx="6.9" cy="45.3" r="4.2" fill="currentColor"/><circle class="n" cx="16.2" cy="31.4" r="4.2" fill="currentColor"/>
+      <circle class="n" cx="32" cy="26" r="4.2" fill="currentColor"/><circle class="n" cx="47.8" cy="31.4" r="4.2" fill="currentColor"/>
+      <circle class="n" cx="57.1" cy="45.3" r="4.2" fill="currentColor"/>
+      <circle cx="32" cy="52" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+    </svg>
     <div id="bar"><i></i></div>
   </div>
   <div id="loader">
@@ -222,8 +223,11 @@ html,body{height:100%;background:var(--surround);overflow:hidden;color:var(--ink
    Nodestra — "Signal Flow" ad.
    Everything on screen is a pure function of one clock `t`, so
    pause / skip / loop are exact and nothing accumulates state.
-   Stage space: 1600×1000. Screenshot space: 1440×900 CSS px.
+   Stage space: 1600×1000. Panel space: the live screen's pixels at 1440×900.
    ============================================================ */
+// The clock and its state, first: every listener below may read them (no TDZ).
+let t = 0, last = null, playing = true, raf = 0, dirty = true, started = false, dpr = 1, buffering = false, renderN = 0;
+const QS = new URLSearchParams(location.search);
 const W = 1600, H = 1000, PER = 1400, OX = 800, OY = 500, D2R = Math.PI / 180;
 const $ = (s) => document.querySelector(s);
 const stage = $('#stage'), world = $('#world'), cv = $('#fx'), ctx = cv.getContext('2d');
@@ -233,8 +237,7 @@ const COL = {
   amber: '#f5a524', bow: '#f0a35a', silver: '#e6e6e6'
 };
 const mq = matchMedia('(prefers-reduced-motion: reduce)');
-let reduced = mq.matches;
-if (mq.addEventListener) mq.addEventListener('change', (e) => { reduced = e.matches; dirty = true; });
+let reduced = mq.matches; // its 'change' listener is under "fit, clock, controls"
 
 /* ---------- math helpers ---------- */
 const clamp = (x, a = 0, b = 1) => (x < a ? a : x > b ? b : x);
@@ -255,7 +258,7 @@ function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255
 
 /* ---------- scenes ---------- */
 const SC = [
-  { id: 'intro',    d: 3.6, kind: 'intro' },
+  { id: 'intro',    d: 3.6, kind: 'intro', rest: 1.8 },
   { id: 'stage',    d: 4.3, kind: 'stage', eb: 'The stage',       cap: 'The lights come up on a grand piano.', ci: 1.6, rest: 3.4 },
   { id: 'piano',    d: 4.8, kind: 'stage', eb: 'Play the piano', cap: 'Play from your keyboard, or click and tap the keys — chords too.', ci: 1.3, rest: 3.9 },
   { id: 'nodes',    d: 4.5, col: 'audio',  gl: 'audio',  eb: 'Nodes',         cap: 'Each node here is a real sound, and every wire carries it.', ci: 1.4, rest: 3.6 },
@@ -277,61 +280,99 @@ const IDX = {}; SC.forEach((s, i) => { IDX[s.id] = i; });
 const T = (id, l) => SC[IDX[id]].start + l;
 function sceneAt(t) { for (let i = SC.length - 1; i >= 0; i--) if (t >= SC[i].start) return i; return 0; }
 
-/* ---------- images ---------- */
-const IMG = {
-  s01: 'shots/01-stage.jpg', s02: 'shots/02-piano.jpg', s03: 'shots/03-welcome-blip.png', s05: 'shots/05-tutorial-2.png',
-  s06: 'shots/06-graph-effects.png', s07: 'shots/07-info.png', s08: 'shots/08-add-menu.png', s09: 'shots/09-inside-group.png',
-  s10: 'shots/10-group-editor.png', s11: 'shots/11-timeline.png', s12: 'shots/12-grid-finder.png', s13: 'shots/13-violin.png'
-};
-
-
 /* ---------- the app screens are the REAL app, live (showcase frames) ----------
  * Each screen is the Nodestra app itself, running one scene in a showcase frame
  * (`showcase.html?kind=app&scene=…`, `src/showcase/appScenes.ts`): storage
  * isolated, set up through the app's own UI, previews and playhead playing a
- * silent recording. A frame is mounted only around its time on screen (LIVE_LEAD
+ * silent recording. A frame is mounted only around its time on screen (its lead
  * seconds ahead, freed after) — never all ten at once — and the clock waits for
- * a screen that is not ready yet, the way a video buffers. */
+ * a screen that is not ready yet, the way a video buffers. A frame that fails, or
+ * hangs past its deadline, is dropped: its panel stays a dark backdrop and the
+ * clock never waits on it. Each mount is a fresh <iframe>, removed on unmount
+ * (re-pointing `src` would push entries into the tab's Back history, and let a
+ * stale ready from the old document mark the new one ready).
+ *
+ * The scenes the panels show (ids from `src/showcase/appScenes.ts`, checked by
+ * `src/__tests__/tourContract.test.ts`). `lead`: seconds ahead of its time on
+ * screen the frame is mounted (default LIVE_LEAD); `slack`: seconds added to its
+ * liveness deadline. The tutorial waits out Blip's 💡 hint (12 s into its step)
+ * before it reports ready, so it boots earlier and may take longer. */
 const LIVE_SCENES = {
-  'shots/03-welcome-blip.png': 'welcome', 'shots/05-tutorial-2.png': 'tutorial',
-  'shots/06-graph-effects.png': 'effects', 'shots/07-info.png': 'info',
-  'shots/08-add-menu.png': 'addMenu', 'shots/09-inside-group.png': 'insideGroup',
-  'shots/10-group-editor.png': 'groupEditor', 'shots/11-timeline.png': 'timeline',
-  'shots/12-grid-finder.png': 'gridFinder', 'shots/13-violin.png': 'violin'
+  welcome: {}, tutorial: { lead: 24, slack: 15 }, effects: {}, info: {}, addMenu: {},
+  insideGroup: {}, groupEditor: {}, timeline: {}, gridFinder: {}, violin: {}
 };
 const SHOWCASE = '../../showcase.html';
-const LIVE_LEAD = 10, LIVE_TAIL = 1;
-const liveFrames = new Map(); // iframe -> { scene, mounted, ready }
-addEventListener('message', (e) => {
-  if (e.origin !== location.origin || !e.data || e.data.type !== 'showcase:ready') return;
-  for (const [f, lf] of liveFrames) if (f.contentWindow === e.source) { lf.ready = true; dirty = true; }
-});
-const uiLoads = [];
-function shotEl(src, cls) {
-  if (src === IMG.s01) return liveHost('s01');
-  if (src === IMG.s02) return liveHost('s02');
-  const scene = LIVE_SCENES[src];
-  if (!scene) { const im = document.createElement('img'); im.alt = ''; im.draggable = false; im.decoding = 'async'; im.src = src; if (cls) im.className = cls; return im; }
+const LIVE_LEAD = 10, LIVE_TAIL = 1, LIVE_DEADLINE = 30;
+const liveFrames = new Map(); // panel (segment) -> { scene, lead, deadline, mounted, f, ready, failed, age }
+let pin = null; // the panel "Tuning up…" waits for: kept mounted until the clock reaches its window
+const warnedDegraded = new Set(); // scenes whose degraded ready was already logged (frames remount every loop)
+/** Is `t` inside [a, b] on the looping clock (circular, so a window may cross the wrap)? */
+const inWin = (t, a, b) => ((t - a) % TOTAL + TOTAL) % TOTAL <= b - a;
+function mountFrame(lf) {
   const f = document.createElement('iframe');
-  f.width = 1440; f.height = 900; f.tabIndex = -1;
+  f.width = 1440; f.height = 900; f.tabIndex = -1; f.inert = true; f.setAttribute('inert', '');
   f.setAttribute('scrolling', 'no'); f.setAttribute('aria-hidden', 'true'); f.setAttribute('title', '');
-  if (cls) f.className = cls;
-  liveFrames.set(f, { scene, mounted: false, ready: false });
+  f.src = `${SHOWCASE}?kind=app&scene=${encodeURIComponent(lf.scene)}`;
+  Object.assign(lf, { mounted: true, f, ready: false, failed: false, age: 0 });
   return f;
 }
+function dropFrame(sg, lf) { // the element goes, and with it the app's document
+  if (lf.f) lf.f.remove();
+  lf.f = null; lf.ready = false;
+  if (sg === s09) unhookInside();
+}
+function failFrame(sg, lf, why) {
+  if (lf.failed) return;
+  console.warn(`[tour] scene ${lf.scene} failed: ${why}`);
+  lf.failed = true; dirty = true;
+  dropFrame(sg, lf); // stays "mounted" (no retry) until its window passes
+}
+addEventListener('message', (e) => {
+  const m = e.data;
+  if (e.origin !== location.origin || !m || typeof m.type !== 'string') return;
+  for (const [sg, lf] of liveFrames) {
+    if (!lf.f || lf.f.contentWindow !== e.source) continue;
+    if (m.type === 'showcase:ready' && !lf.failed && !lf.ready) {
+      lf.ready = true; lf.f.classList.add('ready'); dirty = true;
+      if (Array.isArray(m.degraded) && m.degraded.length && !warnedDegraded.has(lf.scene)) { // still shown (Q3 pending); said once per scene
+        warnedDegraded.add(lf.scene);
+        console.warn(`[tour] scene ${lf.scene} is ready but degraded: ${m.degraded.join(', ')}`);
+      }
+    } else if (m.type === 'showcase:failed') failFrame(sg, lf, String(m.message));
+  }
+});
 /** Mounts the frames whose screens are near `t`, frees the rest; true while a
- *  screen about to show (or showing) is not ready — the clock then waits. */
-function liveFramesAt(t) {
+ *  screen about to show (or showing) is not ready — the clock then waits. `dt`:
+ *  real seconds since the last call, which age the frames still booting. */
+function liveFramesAt(t, dt) {
   let waiting = false;
-  for (const sg of SEGS) {
-    const f = sg.el.querySelector('iframe'), lf = f && liveFrames.get(f);
-    if (!lf) continue;
-    const near = t >= sg.t0 - LIVE_LEAD && t <= sg.t1 + LIVE_TAIL;
-    if (near && !lf.mounted) { lf.mounted = true; lf.ready = false; f.src = `${SHOWCASE}?kind=app&scene=${lf.scene}`; }
-    else if (!near && lf.mounted) { lf.mounted = false; lf.ready = false; f.src = 'about:blank'; }
-    if (lf.mounted && !lf.ready && t >= sg.t0 - 0.25 && t <= sg.t1) waiting = true;
+  for (const [sg, lf] of liveFrames) {
+    const near = sg.win.some(([a, b]) => inWin(t, a - lf.lead, b + LIVE_TAIL));
+    if (near && sg === pin) pin = null;
+    if ((near || sg === pin) && !lf.mounted) sg.el.appendChild(mountFrame(lf));
+    else if (!near && sg !== pin && lf.mounted) { dropFrame(sg, lf); lf.mounted = false; lf.failed = false; }
+    if (!lf.mounted || lf.ready || lf.failed) continue;
+    lf.age += dt;
+    if (lf.age > lf.deadline) { failFrame(sg, lf, `not ready ${lf.deadline} s after mounting`); continue; }
+    if (sg.win.some(([a, b]) => inWin(t, a - 0.25, b))) waiting = true;
   }
   return waiting;
+}
+/** Where each live panel is on screen, as [from, to] stretches of the clock. Animated: its keyframe
+ *  span. Reduced motion shows only rest poses (see render): a panel is on screen through the scenes
+ *  whose rest pose shows it, and in the 0.9 s cross-fade before one. A panel never shown has none,
+ *  so its frame is never mounted or waited for. */
+function liveWindows() {
+  const shown = (sg, at) => { const p = poseAt(sg, at); return p.in && p.o > 0.003; };
+  for (const sg of liveFrames.keys()) {
+    if (!reduced) { sg.win = [[sg.t0, sg.t1]]; continue; }
+    sg.win = [];
+    SC.forEach((sc, i) => {
+      const nx = SC[(i + 1) % SC.length];
+      if (shown(sg, sc.start + sc.rest)) sg.win.push([sc.start, sc.start + sc.d]);
+      else if (shown(sg, nx.start + nx.rest)) sg.win.push([sc.start + sc.d - 0.9, sc.start + sc.d]);
+    });
+  }
 }
 
 /* ---------- live stage: one WebGL canvas shared by the 01 / 02 panels ---------- */
@@ -353,18 +394,50 @@ function liveHost(kind) {
   return host;
 }
 const LIVE_HOSTS = { s01: [], s02: [] };
-const liveCanvas = document.createElement('canvas');
-const liveStage = window.NodestraStage.createStageScene(liveCanvas, { reducedMotion: false });
-liveStage.resize(1440, 900);
+const STAGE_STUB = { resize() {}, flyIn() {}, cancelFlight() {}, pause() {}, resume() {}, setLive() {}, setLiveKey() {}, quality: () => 'none', dispose() {} };
+let liveCanvas = null, liveStage = STAGE_STUB;
+/** The 3D stage on a fresh canvas (in the old one's place), or — no WebGL, or `piano-stage.js` missing —
+ *  a no-op stand-in: the 01/02 overlays then show over their hosts' dark backdrop and the tour plays on.
+ *  Reduced motion is fixed at creation (a still frame, no loop), so a change re-creates the stage. */
+function makeStage() {
+  const old = liveCanvas;
+  liveCanvas = document.createElement('canvas');
+  if (old && old.parentNode) old.replaceWith(liveCanvas);
+  try {
+    const s = window.NodestraStage.createStageScene(liveCanvas, { reducedMotion: reduced });
+    s.resize(1440, 900);
+    s.pause(); // until render() finds its panel shown (stageGate)
+    return s;
+  } catch (err) {
+    console.error('[tour] the 3D stage could not start (no WebGL, or piano-stage.js missing); its panels show their overlays on a dark backdrop.', err);
+    return STAGE_STUB;
+  }
+}
+liveStage = makeStage();
+function remakeStage() {
+  try { liveStage.dispose(); } catch (err) { /* a half-built stage: nothing more to free */ }
+  liveStage = makeStage();
+  lvLive = null; stageOn = null; dirty = true;
+}
 // The piano beat plays C, E, G (keys A, D, G — the lit keys of the original 02 shot), then the chord.
 const LV_NOTES = [['a', 39], ['d', 43], ['g', 46]];
 const lvHeld = new Map();
-let lvLive = null, lvParent = null;
+let lvLive = null, lvParent = null, lvSeg = null, stageOn = null;
+/** The stage draws only while the panel holding its canvas is shown and the tour plays (edge-triggered). */
+function stageGate() {
+  const on = !!lvSeg && lvSeg.vis && playing;
+  if (on === stageOn) return;
+  stageOn = on;
+  if (on) liveStage.resume(); else liveStage.pause();
+}
 function liveSync(t) {
   const live = t >= T('piano', 0);
   if (live !== lvLive) { liveStage.setLive(live); lvLive = live; }
   const parent = t < T('piano', 0.6) ? LIVE_HOSTS.s01[0] : t < T('physical', 0.3) ? LIVE_HOSTS.s02[0] : LIVE_HOSTS.s02[1];
-  if (parent && parent !== lvParent) { parent.insertBefore(liveCanvas, parent.firstChild); lvParent = parent; }
+  if (parent && parent !== lvParent) {
+    parent.insertBefore(liveCanvas, parent.firstChild); lvParent = parent;
+    lvSeg = SEGS.find((s) => s.el === parent.parentNode) || null;
+  }
   const lp = t - T('piano', 0);
   LV_NOTES.forEach(([k, note], i) => {
     const on = (lp >= 1.7 + i * 0.45 && lp < 2.1 + i * 0.45) || (lp >= 3.3 && lp < 4.6);
@@ -379,17 +452,23 @@ function liveSync(t) {
 /* ---------- panels (segments) with per-property keyframe tracks ---------- */
 const SEGS = [];
 const DEF = { u: 720, v: 450, x: 800, y: 490, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], vb: 0 };
-function seg(key, keys) {
+/** A panel: `{ stage: 's01' | 's02' }` hosts the 3D stage's canvas and overlays; `{ live: <scene id> }`
+ *  holds a live app screen (its frame is mounted by liveFramesAt, over the panel's dark backdrop). */
+function seg(screen, keys) {
   const el = document.createElement('div'); el.className = 'panel';
-  const im = shotEl(IMG[key]);
-  el.appendChild(im); world.appendChild(el);
+  if (screen.stage) el.appendChild(liveHost(screen.stage));
+  world.appendChild(el);
   const tracks = {}; let t0 = 1e9, t1 = -1e9;
   for (const [t, props, ez] of keys) {
     t0 = Math.min(t0, t); t1 = Math.max(t1, t);
     for (const k in props) (tracks[k] || (tracks[k] = [])).push([t, props[k], ez || 'io']);
   }
   for (const k in tracks) tracks[k].sort((a, b) => a[0] - b[0]);
-  const sg = { key, el, tracks, t0, t1, cur: null, vis: false, cache: {} };
+  const sg = { key: screen.live || screen.stage, el, tracks, t0, t1, win: [[t0, t1]], cur: null, vis: false, cache: {} };
+  if (screen.live) {
+    const ls = LIVE_SCENES[screen.live] || {};
+    liveFrames.set(sg, { scene: screen.live, lead: ls.lead ?? LIVE_LEAD, deadline: LIVE_DEADLINE + (ls.slack || 0), mounted: false, f: null, ready: false, failed: false, age: 0 });
+  }
   SEGS.push(sg); return sg;
 }
 function lerp(a, b, k) { if (typeof a === 'number') return a + (b - a) * k; return a.map((v, i) => v + (b[i] - v) * k); }
@@ -418,7 +497,7 @@ function poseAt(sg, t) {
 }
 const IDP = withTrig({ u: 0, v: 0, x: 0, y: 0, z: 0, s: 1, rx: 0, ry: 0, rz: 0, o: 1, l: 1, b: 0, c: [0, 0, 0, 0], in: true });
 /* Same math as the CSS: translate3d · rotateX · rotateY · rotateZ · scale · translate(-u,-v), then the
-   parent's perspective (1400px, origin 800/500). Lets particles sit on exact screenshot pixels. */
+   parent's perspective (1400px, origin 800/500). Lets particles sit on exact pixels of a live screen (1440×900). */
 function proj(p, u, v) {
   const x = (u - p.u) * p.s, y = (v - p.v) * p.s;
   const x1 = x * p.cz - y * p.sz, y1 = x * p.sz + y * p.cz;
@@ -507,7 +586,7 @@ function bz(a, b, c, d, t) {
     3 * m * m * (b[1] - a[1]) + 6 * m * t * (c[1] - b[1]) + 3 * t * t * (d[1] - c[1])
   ];
 }
-/* A point spec: [x,y] in stage space, or {seg,u,v} = a pixel of a screenshot wherever that panel is now. */
+/* A point spec: [x,y] in stage space, or {seg,u,v} = a pixel of the live screen at 1440×900, wherever that panel is now. */
 function at(spec) { if (Array.isArray(spec)) return spec; return proj(spec.seg.cur, spec.u, spec.v); }
 
 /* ---------- effects (each a pure function of t inside its window) ---------- */
@@ -561,7 +640,7 @@ function spark(x, y, age, cols, seed, sc) {
 }
 function burstAt(spec, t0, cols, sc) { const seed = seedN++ * 97; fx(t0, t0 + 1.15, (t) => { const p = at(spec); spark(p[0], p[1], t - t0, cols, seed, sc); }); }
 
-/* Paths in screenshot space: React Flow–style bezier wires, or smoothed polylines. */
+/* Paths in a live screen's pixels at 1440×900: React Flow–style bezier wires, or smoothed polylines. */
 function wire(a, b) { const dx = b[0] - a[0]; const k = dx >= 0 ? Math.max(dx * 0.5, 8) : 0.25 * 25 * Math.sqrt(-dx); return { bz: [a, [a[0] + k, a[1]], [b[0] - k, b[1]], b] }; }
 function smooth(pts, n = 8) {
   const out = [];
@@ -660,7 +739,7 @@ function rise(o) {
     }
   });
 }
-/* Slow floating motes inside a region of a screenshot (the stage's own spotlight dust). */
+/* Slow floating motes inside a region of a panel, in the live screen's pixels at 1440×900 (the stage's own spotlight dust). */
 function dust(o) {
   const seed = seedN++ * 71, [x0, y0, x1, y1] = o.rect, w = x1 - x0, h = y1 - y0;
   fx(o.t0, o.t1, (t) => {
@@ -686,7 +765,7 @@ function edgeFlash(o) {
     strokePoly(q, o.col, 14, a * 0.18); strokePoly(q, o.col, 2, a * 0.8);
   });
 }
-/* A single comet that runs once along a path in a screenshot. */
+/* A single comet that runs once along a path in a live screen (its pixels at 1440×900). */
 function trace(o) {
   const pth = samplePath({ pts: o.pts, raw: true });
   fx(o.t0, o.t0 + o.dur + 0.4, (t) => {
@@ -701,12 +780,12 @@ function trace(o) {
 }
 
 /* ============================================================
-   THE SHOTS — coordinates are real pixels of each screenshot
-   (1440×900 CSS px), measured from the 2880×1800 captures.
+   THE SHOTS — coordinates are the live screen's pixels at 1440×900
+   (first measured on the approved 2880×1800 captures; an app layout change moves them).
    ============================================================ */
 
 /* S0 — the stage (01) rises out of the void; four socket-coloured streams plug into the piano. */
-const s01 = seg('s01', [
+const s01 = seg({ stage: 's01' }, [
   [T('stage', 0), { u: 720, v: 450, x: 800, y: 470, z: -1600, s: 1.0, ry: -12, rx: 8, o: 0, l: 0.08, b: 0 }],
   [T('stage', 0.7), { o: 1 }, 'o'],
   [T('stage', 1.35), { l: 0.08 }],
@@ -724,7 +803,7 @@ edgeFlash({ seg: s01, t0: T('stage', 1.35), col: COL.gold });
 dust({ seg: s01, rect: [520, 190, 900, 600], n: 60, col: COL.gold, t0: T('stage', 1.4), t1: T('piano', 1.1), speed: 8 });
 
 /* S1 — "Play the piano" (02): the camera glides in to the keys, the lit C–E–G chord sings. */
-const s02 = seg('s02', [
+const s02 = seg({ stage: 's02' }, [
   [T('piano', 0.25), { u: 722, v: 497, x: 800, y: 470, s: 0.6, o: 0, z: 0 }],
   [T('piano', 0.95), { o: 1 }],
   [T('piano', 1.35), { s: 1.111, u: 720, v: 470 }, 'o'],
@@ -738,7 +817,7 @@ KEYS.forEach(([u, v]) => rise({ seg: s02, u, v, t0: T('piano', 3.3), col: COL.go
 dust({ seg: s02, rect: [150, 0, 1300, 520], n: 70, col: COL.gold, t0: T('piano', 0.8), t1: T('nodes', 1.0), speed: 7 });
 
 /* S2/S3 — the effects graph (06). Notes become wires; audio flows along the real wires. */
-const s06 = seg('s06', [
+const s06 = seg({ live: 'effects' }, [
   [T('nodes', 0), { u: 720, v: 450, x: 1000, y: 520, z: -1100, s: 0.95, ry: -24, rx: 6, o: 0, l: 0.15 }],
   [T('nodes', 0.35), { o: 1 }],
   [T('nodes', 1.15), { l: 0.15 }],
@@ -768,7 +847,7 @@ box({ seg: s06, rect: [1255, 407, 1386, 444], col: COL.signal, t0: T('live', 1.2
 box({ seg: s06, rect: [617, 8, 736, 36], col: COL.audio, t0: T('live', 1.9), t1: T('live', 3.7) });
 
 /* S4 — ⓘ docs (07): identical graph, now with Stutter's tooltip. A signal stream "hovers" the ⓘ. */
-const s07 = seg('s07', [
+const s07 = seg({ live: 'info' }, [
   [T('info', 0.85), { u: 880, v: 400, x: 800, y: 490, s: 1.25, o: 0 }],
   [T('info', 1.25), { o: 1 }],
   [T('info', 1.45), { s: 1.25, u: 880, v: 400 }],
@@ -782,7 +861,7 @@ ring({ seg: s07, u: 841, v: 408, r: 9, col: COL.signal, t0: T('info', 1.1), t1: 
 box({ seg: s07, rect: [681, 346, 1001, 397], col: COL.silver, t0: T('info', 1.45), t1: T('menu', 0.6) });
 
 /* S5 — the Add menu (08): Add Node ▸ Easy Effects, eight effects light up one by one. */
-const s08 = seg('s08', [
+const s08 = seg({ live: 'addMenu' }, [
   [T('menu', 0), { u: 720, v: 450, x: 1250, y: 500, z: -1200, s: 1.0, ry: -28, rx: 4, o: 0, l: 0.15 }],
   [T('menu', 0.35), { o: 1 }],
   [T('menu', 1.05), { l: 0.15 }],
@@ -821,7 +900,7 @@ PZ.forEach(([z, pdy], i) => K11.push([fr(8 + i), { s: 1.9 * z, y: 500 + pdy }, '
   K11.push([EXPT + EXPD, { c: [0, 0, 0, 0], s: 0.95, u: 720, v: 450, x: 800, y: 490 }, 'o']); }
 
 /* S6 — Echo opens up (09): the group grows out of its menu item; signals and audio run inside. */
-const s09 = seg('s09', [
+const s09 = seg({ live: 'insideGroup' }, [
   [T('inside', 0.3), { u: 720, v: 450, x: 640, y: 470, s: 0.06, o: 0 }],
   [T('inside', 0.7), { o: 1 }],
   [T('inside', 4.5), { x: 800, y: 490, s: 1.2, u: 820, v: 430 }, 'o5'],
@@ -838,7 +917,7 @@ box({ seg: s09, rect: [860, 437, 1015, 456], col: COL.number, t0: T('inside', 2.
 box({ seg: s09, rect: [1035, 437, 1191, 456], col: COL.audio, t0: T('inside', 2.8), t1: T('path', 0.4), ph: 0.9 });
 
 /* S7 — Menu Path (10): the pencil opens "Edit Node Type"; the panel wipes in from the right. */
-const s10 = seg('s10', [
+const s10 = seg({ live: 'groupEditor' }, [
   [T('path', 0.45), { u: 820, v: 430, x: 800, y: 490, s: 1.2, o: 1, c: [0, 0, 0, 1440] }],
   [T('path', 1.3), { c: [0, 0, 0, 1121] }, 'o'],
   [T('path', 1.36), { c: [0, 0, 0, 0] }, 'l'],
@@ -861,7 +940,7 @@ box({ seg: s10, rect: [1133, 407, 1391, 433], col: COL.silver, t0: T('path', 2.7
 trace({ seg: s10, pts: [[1141, 437], [1382, 437]], t0: T('path', 2.9), dur: 1.1, col: COL.pink });
 
 /* S8 — the timeline (11), playing: the lime "pad cutoff" curve carries light across the bars. */
-const s11 = seg('s11', [
+const s11 = seg({ live: 'timeline' }, [
   ...K11,
   [T('curves', 5.0), { s: 1.38, u: 980, v: 690, ry: 0 }],
   [T('grid', 1.0), { o: 1 }],
@@ -875,19 +954,23 @@ flow({ seg: s11, t0: EXPT + EXPD, t1: T('grid', 1.25), gap: 6, speed: 120, size:
     Object.assign(wire([421, 214], [536, 356]), { col: COL.signal }), Object.assign(wire([421, 300], [538, 356]), { col: COL.signal }),
     Object.assign(wire([577, 425], [623, 456]), { col: COL.audio })] });
 // The playhead moves (the scene plays its recording): its highlight follows
-// the live playhead in the frame, falling back to where the snapshot had it.
+// the live playhead in the frame (once ready), falling back to where the snapshot had it.
+// Read at most once per rendered frame: each read forces layout inside the frame.
+let phN = -1, phU = 789;
 const playheadU = () => {
-  const d = s11.el.querySelector('iframe')?.contentDocument;
+  if (phN === renderN) return phU;
+  phN = renderN;
+  const lf = liveFrames.get(s11), d = lf && lf.ready && lf.f ? lf.f.contentDocument : null;
   const ph = d?.querySelector('[class~="rbnt:border-tl-accent"][class~="rbnt:w-0"]');
   const x = ph ? ph.getBoundingClientRect().x : NaN;
-  return Number.isFinite(x) && x > 0 ? x : 789;
+  return (phU = Number.isFinite(x) && x >= 0 ? x : 789);
 };
 box({ seg: s11, rect: () => { const u = playheadU(); return [u - 1, 690, u + 1, 900]; }, col: COL.amber, pad: 1, t0: T('curves', 1.8), t1: T('grid', 0.6) });
 ring({ seg: s11, u: playheadU, v: 814, r: 8, col: COL.lime, t0: T('curves', 1.9), t1: T('grid', 0.6) });
 box({ seg: s11, rect: [677, 594, 857, 612], col: COL.silver, t0: T('curves', 2.5), t1: T('grid', 0.5), ph: 0.4 });
 
 /* S9 — the grid finder (12): opened from "find grid"; the top suggestion and its on-grid hits glow. */
-const s12 = seg('s12', [
+const s12 = seg({ live: 'gridFinder' }, [
   [T('grid', 0.5), { u: 980, v: 690, x: 800, y: 490, s: 1.38, o: 0 }],
   [T('grid', 0.95), { o: 1 }],
   [T('grid', 1.1), { s: 1.38, u: 980, v: 690 }],
@@ -901,7 +984,7 @@ box({ seg: s12, rect: [281, 301, 504, 366], col: COL.amber, t0: T('grid', 1.4), 
   burstAt({ seg: s12, u: x * 0.72, v: 367 }, T('grid', 2.0 + i * 0.11), [COL.audio, '#ffffff'], 0.22));
 
 /* S10 — the library (13's sidebar + tabs). S11 — the same shot pans to the Bowed String column. */
-const s13 = seg('s13', [
+const s13 = seg({ live: 'violin' }, [
   [T('library', 0), { u: 380, v: 230, x: 1250, y: 520, z: -1100, s: 2.0, ry: -24, rx: 4, o: 0, l: 0.15 }],
   [T('library', 0.35), { o: 1 }],
   [T('library', 1.05), { l: 0.15 }],
@@ -922,7 +1005,7 @@ box({ seg: s13, rect: [178, 85, 248, 102], col: COL.number, t0: T('library', 2.1
 box({ seg: s13, rect: [261, 45, 997, 78], col: COL.silver, t0: T('library', 2.5), t1: T('physical', 0.4), ph: 0.1 });
 
 /* S11 — physically modelled: three floating crops — the struck-string piano, the bowed strings, the demo cards. */
-const s02b = seg('s02', [
+const s02b = seg({ stage: 's02' }, [
   [T('physical', 0.3), { u: 720, v: 320, x: -150, y: 420, z: -700, ry: 34, s: 0.8, o: 0, c: [40, 400, 300, 400] }],
   [T('physical', 0.7), { o: 1 }],
   [T('physical', 1.7), { x: 430, y: 410, z: 0, ry: 14 }, 'o'],
@@ -930,7 +1013,7 @@ const s02b = seg('s02', [
   [T('blip', 0), { o: 1, z: 0 }],
   [T('blip', 0.8), { o: 0, z: -600 }]
 ]);
-const s03 = seg('s03', [
+const s03 = seg({ live: 'welcome' }, [
   [T('physical', 0.8), { u: 685, v: 495, x: 800, y: 1200, z: -400, s: 1.05, rx: -24, o: 0, c: [430, 440, 340, 370] }],
   [T('physical', 1.25), { o: 1 }],
   [T('physical', 2.1), { y: 770, z: 0, rx: 0 }, 'o'],
@@ -952,7 +1035,7 @@ box({ seg: s03, rect: [691, 437, 836, 553], col: COL.signal, t0: T('physical', 3
 box({ seg: s03, rect: [849, 437, 994, 553], col: COL.number, t0: T('physical', 4.1), t1: T('blip', 0.7), ph: 0.75 });
 
 /* S12 — Blip (03 → 05): the Welcome page unfolds, we meet Blip, then Blip spotlights "Demos". */
-const s05 = seg('s05', [
+const s05 = seg({ live: 'tutorial' }, [
   [T('blip', 2.95), { u: 1175, v: 800, x: 800, y: 490, s: 1.75, o: 0 }],
   [T('blip', 3.4), { o: 1 }],
   [T('blip', 3.5), { s: 1.75, u: 1175, v: 800, y: 490 }],
@@ -990,36 +1073,6 @@ function setCap(s, a) {
   s.el.style.opacity = key;
   s.el.style.transform = `translateY(${((1 - a) * 14).toFixed(1)}px)`;
   s.el.style.filter = a > 0.99 ? 'none' : `blur(${((1 - a) * 6).toFixed(2)}px)`;
-}
-
-/* ---------- logo ---------- */
-const logoEl = $('#logo'), wordEl = $('#word'), tagEl = $('#tag'), condEl = $('#cond');
-const wires = [...document.querySelectorAll('#mark .lw')], nodes = [...document.querySelectorAll('#mark .ln')];
-const WL = wires.map((w) => { const L = w.getTotalLength ? w.getTotalLength() : 40; w.style.strokeDasharray = L; return L; });
-const RC = 2 * Math.PI * 6; condEl.style.strokeDasharray = RC;
-const letters = 'Nodestra'.split('').map((ch) => { const s = document.createElement('span'); s.textContent = ch; wordEl.appendChild(s); return s; });
-function renderLogo(L, alpha) {
-  logoEl.style.display = alpha > 0.002 ? 'block' : 'none';
-  if (alpha <= 0.002) return;
-  logoEl.style.opacity = alpha.toFixed(3);
-  const kr = EZ.o(clamp((L - 0.85) / 0.45));
-  condEl.style.strokeDashoffset = (RC * (1 - kr)).toFixed(2);
-  condEl.style.opacity = kr > 0 ? 1 : 0;
-  wires.forEach((w, i) => { const k = EZ.io(clamp((L - (1.05 + i * 0.12)) / 0.6)); w.style.strokeDashoffset = (WL[i] * (1 - k)).toFixed(2); w.style.opacity = k > 0 ? 1 : 0; });
-  nodes.forEach((n, i) => {
-    const k = clamp((L - (1.55 + i * 0.12)) / 0.45), sc = k <= 0 ? 0 : EZ.back(k);
-    const cx = +n.getAttribute('cx'), cy = +n.getAttribute('cy');
-    n.setAttribute('transform', `translate(${cx} ${cy}) scale(${sc.toFixed(3)}) translate(${-cx} ${-cy})`);
-  });
-  letters.forEach((s, j) => {
-    const k = EZ.o(clamp((L - (2.25 + j * 0.06)) / 0.7));
-    s.style.opacity = k.toFixed(3);
-    s.style.transform = `translateY(${((1 - k) * 26).toFixed(1)}px)`;
-    s.style.filter = k > 0.99 ? 'none' : `blur(${((1 - k) * 8).toFixed(1)}px)`;
-  });
-  const kt = EZ.o(clamp((L - 3.0) / 0.8));
-  tagEl.style.opacity = kt.toFixed(3);
-  tagEl.style.transform = `translateY(${((1 - kt) * 12).toFixed(1)}px)`;
 }
 
 /* ---------- ambient void: dot-grid parallax + slow motes ---------- */
@@ -1125,9 +1178,16 @@ function stageLights(sc, l) {
 
 /* ---------- Slime effects ported in (pure functions of t) ---------- */
 const EOa = (x) => 1 - Math.pow(1 - clamp(x), 3);
-const HK9 = { ready: false };
+const HK9 = { ready: false, doc: null, nodes: [], edges: [] };
+/** The scene-09 frame's document, once it reports ready: while it sets up it shows other graphs. */
+function insideDoc() { const lf = liveFrames.get(s09); return lf && lf.ready && lf.f ? lf.f.contentDocument : null; }
+/** Lets go of the hooked graph (its pulse circles leave the app's edges), so a freed frame's document is not kept alive. */
+function unhookInside() {
+  HK9.edges.forEach((e) => e.c.remove());
+  HK9.ready = false; HK9.doc = null; HK9.nodes = []; HK9.edges = [];
+}
 function hookInside() {
-  const f = s09.el.querySelector('iframe'), d = f && f.contentDocument;
+  const d = insideDoc();
   if (!d || !d.querySelector('.react-flow__node')) return false;
   HK9.doc = d;
   const pos = (n) => { const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(n.style.transform || ''); return m ? [+m[1], +m[2]] : [0, 0]; };
@@ -1148,8 +1208,8 @@ function hookInside() {
 }
 const sv = (el, k, v) => { if (el['__' + k] !== v) { el['__' + k] = v; el.style[k] = v; } };
 function insideSync(t) {
-  const fd = s09.el.querySelector('iframe')?.contentDocument;
-  if (HK9.ready && HK9.doc !== fd) HK9.ready = false; // the frame was remounted
+  // re-hook when the frame was remounted or freed, or the app re-rendered the hooked nodes
+  if (HK9.ready && (HK9.doc !== insideDoc() || !HK9.nodes[0]?.isConnected)) unhookInside();
   if (!HK9.ready && !hookInside()) return;
   const TL = T('inside', 1.35);
   const active = !reduced && t >= T('inside', 0) && t < T('path', 1.8);
@@ -1193,8 +1253,8 @@ function transSync(t) {
 /* ---------- frame ---------- */
 const barEl = $('#bar i'), scrimB = $('#scrimB'), scrimT = $('#scrimT'), hud = $('#hud');
 SC.forEach((s, i) => { if (!i) return; const b = document.createElement('b'); b.style.left = (s.start / TOTAL * 100).toFixed(3) + '%'; $('#bar').appendChild(b); });
-let dpr = 1;
 function render(t) {
+  renderN++;
   liveSync(t);
   const i = sceneAt(t), sc = SC[i], l = t - sc.start;
   const j = (i + 1) % SC.length, nx = SC[j];
@@ -1211,6 +1271,7 @@ function render(t) {
       use.in = o > 0.003; use.b = 0; sg.cur = use; applySeg(sg, use, o);
     }
   }
+  stageGate();
   // captions + scrims
   let aB = 0, aT = 0;
   SC.forEach((s, k) => {
@@ -1225,8 +1286,6 @@ function render(t) {
   });
   scrimB.style.opacity = aB.toFixed(3);
   scrimT.style.opacity = aT.toFixed(3);
-  // B's own logo is replaced by A's final slide.
-  renderLogo(0, 0);
   stageLights(sc, l);
   insideSync(t);
   transSync(t);
@@ -1252,31 +1311,40 @@ function fit() {
   mv.width = cv.width; mv.height = cv.height;
   dirty = true;
 }
-let t = 0, last = null, playing = true, raf = 0, dirty = true, started = false;
+const bufEl = $('#buf');
+/** Buffering = the tour plays, but a screen on (or about to be on) the stage is not ready, so the clock
+ *  waits. Shown by the corner mark, `__tour.isBuffering()` and a `tourbuffering` event (detail: boolean). */
+function setBuffering(v) {
+  if (v === buffering) return;
+  buffering = v; bufEl.classList.toggle('on', v);
+  dispatchEvent(new CustomEvent('tourbuffering', { detail: v }));
+}
 function frame(ts) {
   raf = requestAnimationFrame(frame);
-  if (last === null) last = ts;
-  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-  const buffering = liveFramesAt(t);
-  if (playing && !buffering) { t += dt; if (t >= TOTAL) t -= TOTAL; dirty = true; }
+  const rdt = last === null ? 0 : (ts - last) / 1000; last = ts;
+  const waiting = liveFramesAt(t, Math.min(1, rdt));
+  setBuffering(waiting && playing);
+  if (playing && !waiting) { t += Math.min(0.05, rdt); if (t >= TOTAL) t -= TOTAL; dirty = true; }
   if (dirty) { render(t); dirty = false; }
 }
 function run() { if (!raf && started && !document.hidden) { last = null; raf = requestAnimationFrame(frame); } }
 function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; }
 function setPlaying(v) { playing = v; hud.classList.toggle('on', !v); dirty = true; dispatchEvent(new CustomEvent('tourplaying', { detail: playing })); }
-function seek(to) { t = ((to % TOTAL) + TOTAL) % TOTAL; dirty = true; if (!raf) render(t); }
-window.__adSeek = (x) => { halt(); seek(x); render(t); }; window.__adTotal = TOTAL; window.__adNow = () => t;
+function seek(to) { t = ((to % TOTAL) + TOTAL) % TOTAL; if (started) pin = null; dirty = true; if (!raf) render(t); }
+if (QS.has('debug')) { window.__adSeek = (x) => { halt(); seek(x); render(t); }; window.__adTotal = TOTAL; window.__adNow = () => t; }
 function skip(dir) {
   const i = sceneAt(t);
   if (dir > 0) seek(SC[(i + 1) % SC.length].start + 0.001);
   else seek(t - SC[i].start > 1.0 ? SC[i].start + 0.001 : SC[(i - 1 + SC.length) % SC.length].start + 0.001);
 }
 stage.addEventListener('click', () => setPlaying(!playing));
-if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');
+if (QS.has('embed')) document.documentElement.classList.add('embed');
+if (QS.has('capture')) document.documentElement.classList.add('capture');
 window.__tour = {
   skipBy(sec) { seek(t + sec); },
   toggle() { setPlaying(!playing); return playing; },
   isPlaying: () => playing,
+  isBuffering: () => buffering,
 };
 addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
@@ -1285,29 +1353,33 @@ addEventListener('keydown', (e) => {
 });
 document.addEventListener('visibilitychange', () => { if (document.hidden) halt(); else run(); });
 addEventListener('resize', fit);
+// Reduced motion changed: the live windows follow the other pose schedule, and the stage is re-created.
+if (mq.addEventListener) mq.addEventListener('change', (e) => { reduced = e.matches; liveWindows(); remakeStage(); dirty = true; });
+liveWindows();
 fit();
 
-/* ---------- preload, then start ---------- */
-const lbar = $('#loader .lbar i'), keep = [];
-const srcs = []; // no images at all in this variant
-let done = 0;
-const tick = () => { done++; lbar.style.width = (done / srcs.length * 100).toFixed(1) + '%'; };
-const loads = srcs.map((src) => new Promise((res) => {
-  const im = new Image(); keep.push(im);
-  im.onload = () => { (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { tick(); res(); }); };
-  im.onerror = () => { tick(); res(); };
-  im.src = src;
-}));
+/* ---------- "Tuning up…": the first live screen (06) gets ready, or fails, then the clock starts ---------- */
+const lbar = $('#loader .lbar i');
+pin = s06;
+let bootLast = null;
+function boot(ts) {
+  if (started) return;
+  const rdt = bootLast === null ? 0 : (ts - bootLast) / 1000; bootLast = ts;
+  liveFramesAt(t, Math.min(1, rdt));
+  const lf = liveFrames.get(s06);
+  if (!lf.mounted || lf.ready || lf.failed) { lbar.style.width = '100%'; setTimeout(start, 250); return; }
+  lbar.style.width = (90 * (1 - Math.exp(-lf.age / 6))).toFixed(1) + '%'; // its boot, eased (the deadline ends it)
+  requestAnimationFrame(boot);
+}
 function start() {
   if (started) return;
   started = true;
   $('#loader').classList.add('gone');
   stage.classList.add('ready');
-  render(0);
+  render(t);
   run();
 }
-Promise.all(loads.concat(uiLoads)).then(() => setTimeout(start, 250));
-setTimeout(start, 20000); // never hang on a missing image
+requestAnimationFrame(boot);
 })();
 </script>
 </body>

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { NodePreviewProps } from '@theclearsky/react-blender-nodes';
-import type * as Tone from 'tone';
 import { isSignalChain } from '../../soundDefinitions/valueTypes';
-import { acquireTap, registerPainter } from './tapManager';
+import { acquireTap, readArray, registerPainter } from './tapManager';
 
 // 2× backing store — CSS scales to the node width.
 const WIDTH = 880;
@@ -20,7 +19,8 @@ function findSignalChain(live: NodePreviewProps['live']) {
 /**
  * Signal preview: a seconds-wide trace + the live numeric readout —
  * where "the number changes" is SEEN on Pulser/Constant/KeyboardPitch nodes.
- * Tap = Tone.DCMeter (raw signed value).
+ * Tap = a small Tone.Waveform whose LAST sample is the live value (raw,
+ * signed — see `tapManager.makeAnalyser`).
  */
 function SignalPreview({ nodeId, live }: NodePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -51,7 +51,7 @@ function SignalPreview({ nodeId, live }: NodePreviewProps) {
         return;
       }
       if (tap) {
-        const buffer = (tap.analyser as Tone.Waveform).getValue();
+        const buffer = readArray(tap);
         const value = buffer[buffer.length - 1];
         if (Number.isFinite(value)) {
           const trace = traceRef.current;

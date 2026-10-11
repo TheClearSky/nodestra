@@ -5,9 +5,12 @@
  * mounted on the landing page. Each costs real work — thousands of elements,
  * ReactFlow measuring — so the page keeps only a few at once: slots ASK to go
  * live when they scroll near, the scheduler GRANTS mounts one at a time in an
- * idle moment (never several in the same frame while the visitor scrolls),
- * most-visible first, and EVICTS the least-visible live slot when a more
- * visible one is waiting and the budget is full.
+ * idle moment, most-visible first — and the next only once the last one has
+ * booted (reported ready, or failed): same-origin frames share the page's
+ * main thread, and two booting at once janked a phone for 30 s. It EVICTS
+ * the least-visible live slot when a more visible one is waiting and the
+ * budget is full; a slot still booting is never evicted. A visitor's own
+ * request (a tap) goes first and takes a place at once.
  *
  * Measured 2026-10-09 on an emulated phone (390x844, DPR 3, CPU /4): the old
  * landing — every screen and the tour mounted at once as iframes — ran its
@@ -19,6 +22,11 @@ type LiveSlotHandle = {
   priority(): number;
   mount(): void;
   unmount(): void;
+};
+
+type LiveEntry = {
+  /** When it reported ready (`readyLive`); null while it boots. */
+  readyAt: number | null;
 };
 
 /** How many showcases may be live at once on this device. */
@@ -77,10 +85,13 @@ function hasScrolled(): boolean {
   return scrolled;
 }
 
-const live = new Map<LiveSlotHandle, number>();
+const live = new Map<LiveSlotHandle, LiveEntry>();
 const waiting = new Set<LiveSlotHandle>();
+/** Asked for by the visitor (a tap): first in line, and never displaced. */
+const explicit = new Set<LiveSlotHandle>();
 let budget: number | undefined;
 let tickQueued = false;
+let recheckTimer: ReturnType<typeof setTimeout> | null = null;
 
 const idle = (callback: () => void) => {
   if ('requestIdleCallback' in window) window.requestIdleCallback(callback, { timeout: 400 });
@@ -88,7 +99,23 @@ const idle = (callback: () => void) => {
 };
 
 function byPriority(a: LiveSlotHandle, b: LiveSlotHandle) {
-  return b.priority() - a.priority();
+  return (explicit.has(b) ? 1 : 0) - (explicit.has(a) ? 1 : 0) || b.priority() - a.priority();
+}
+
+/** Look again in `ms` (one pending re-check at a time). */
+function recheckIn(ms: number) {
+  if (recheckTimer !== null) clearTimeout(recheckTimer);
+  recheckTimer = setTimeout(() => {
+    recheckTimer = null;
+    schedule();
+  }, ms);
+}
+
+function evict(slot: LiveSlotHandle) {
+  live.delete(slot);
+  slot.unmount();
+  // It is still near the viewport: it waits to come back.
+  waiting.add(slot);
 }
 
 /** One grant (or one eviction + grant) per idle moment. */
@@ -97,25 +124,37 @@ function tick() {
   if (waiting.size === 0) return;
   budget ??= liveBudget();
   watchFirstScroll();
-  const next = [...waiting].filter((slot) => hasScrolled() || slot.priority() > 0).sort(byPriority)[0];
+  const next = [...waiting].filter((slot) => explicit.has(slot) || hasScrolled() || slot.priority() > 0).sort(byPriority)[0];
   if (!next) return;
+  const asked = explicit.has(next);
+  // One boot at a time: the next waits for the last to report ready. A
+  // visitor's tap does not wait.
+  if (!asked && [...live.values()].some((entry) => entry.readyAt === null)) return;
   if (live.size >= budget) {
-    const now = performance.now();
-    const settled = [...live.entries()].filter(([, since]) => now - since >= MIN_LIVE_MS).map(([slot]) => slot);
-    const weakest = settled.sort(byPriority).at(-1);
-    // Only a slot that is CLEARLY more visible displaces a live one.
-    if (!weakest || next.priority() - weakest.priority() < EVICT_MARGIN) {
-      // A fresh mount may settle into being evictable: look again then.
-      if (settled.length < live.size) setTimeout(schedule, MIN_LIVE_MS);
-      return;
+    const others = [...live.keys()].filter((slot) => !explicit.has(slot));
+    if (asked) {
+      // The visitor asked: the least visible place goes, booted or not.
+      const weakest = others.sort(byPriority).at(-1);
+      if (!weakest) return;
+      evict(weakest);
+    } else {
+      const now = performance.now();
+      const settled = others.filter((slot) => {
+        const readyAt = live.get(slot)?.readyAt ?? null;
+        return readyAt !== null && now - readyAt >= MIN_LIVE_MS;
+      });
+      const weakest = settled.sort(byPriority).at(-1);
+      // Only a slot that is CLEARLY more visible displaces a live one.
+      if (!weakest || next.priority() - weakest.priority() < EVICT_MARGIN) {
+        // A fresh slot may settle into being evictable: look again then.
+        if (settled.length < others.length) recheckIn(MIN_LIVE_MS);
+        return;
+      }
+      evict(weakest);
     }
-    live.delete(weakest);
-    weakest.unmount();
-    // It is still near the viewport: it waits to come back.
-    waiting.add(weakest);
   }
   waiting.delete(next);
-  live.set(next, performance.now());
+  live.set(next, { readyAt: null });
   next.mount();
   schedule();
 }
@@ -126,16 +165,29 @@ function schedule() {
   idle(tick);
 }
 
-/** The slot scrolled near: it would like to be live. */
-function requestLive(slot: LiveSlotHandle) {
+/** The slot scrolled near: it would like to be live. `explicit`: the
+ *  visitor asked for it (a tap) — it goes first and takes a place at once. */
+function requestLive(slot: LiveSlotHandle, options: { explicit?: boolean } = {}) {
+  if (options.explicit) explicit.add(slot);
   if (live.has(slot)) return;
   waiting.add(slot);
   schedule();
 }
 
-/** The slot scrolled far away (or unmounted): it gives its place up. */
+/** The slot's component booted (it is on screen as itself): it may now be
+ *  evicted after `MIN_LIVE_MS`, and the next slot may boot. */
+function readyLive(slot: LiveSlotHandle) {
+  const entry = live.get(slot);
+  if (!entry || entry.readyAt !== null) return;
+  entry.readyAt = performance.now();
+  schedule();
+}
+
+/** The slot scrolled far away (or unmounted, or failed): it gives its place
+ *  up. */
 function releaseLive(slot: LiveSlotHandle) {
   waiting.delete(slot);
+  explicit.delete(slot);
   if (live.delete(slot)) slot.unmount();
   schedule();
 }
@@ -153,7 +205,7 @@ if (typeof location !== 'undefined' && new URLSearchParams(location.search).has(
       budget,
       scrolled,
       tickQueued,
-      live: [...live.keys()].map((slot) => slot.priority()),
+      live: [...live].map(([slot, entry]) => ({ priority: slot.priority(), ready: entry.readyAt !== null, explicit: explicit.has(slot) })),
       waiting: [...waiting].map((slot) => slot.priority()),
     }),
   };
@@ -166,5 +218,5 @@ function isConstrainedDevice(): boolean {
   return budget <= 1;
 }
 
-export { isConstrainedDevice, releaseLive, reprioritise, requestLive };
+export { isConstrainedDevice, readyLive, releaseLive, reprioritise, requestLive };
 export type { LiveSlotHandle };

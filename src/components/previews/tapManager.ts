@@ -19,10 +19,17 @@ import type { RecordedAnalyser } from './recordedFrames';
 
 type TapMode = 'wave' | 'audiogram' | 'meter' | 'signal';
 
+/** What a preview reads: a live Tone analyser (Waveform, FFT, Meter) — or,
+ *  in a showcase, its recording (`recordedFrames.ts`), which answers
+ *  `getValue()` in the same shape. Painters read it through `readArray` /
+ *  `readLevel`, never by casting to a Tone class. */
+type PreviewAnalyser = {
+  getValue(): Float32Array | number | number[];
+  dispose(): unknown;
+};
+
 type Tap = {
-  /** A live Tone analyser — or, in a showcase, its recording (same
-   *  `getValue()` shape; see `recordedFrames.ts`). */
-  analyser: Tone.Waveform | Tone.FFT | Tone.Meter | RecordedAnalyser;
+  analyser: PreviewAnalyser;
   mode: TapMode;
   buildId: number;
   source: unknown;
@@ -177,9 +184,25 @@ function releaseTap(nodeId: string): void {
 const painters = new Map<object, () => void>();
 const painterCountByNode = new Map<string, number>();
 let rafHandle: number | null = null;
-/** Nobody can see the previews (the landing stage covers the app): the
- *  loop stops outright rather than drawing ~20 waveforms nobody sees. */
+/** Why nobody can see the previews right now — the landing stage covers the
+ *  app ('app'), a showcase frame is off screen ('offscreen'), a recording is
+ *  rendering ('recording'). While any reason holds, the loop stops outright
+ *  rather than drawing ~20 waveforms nobody sees. */
+type PauseReason = 'app' | 'offscreen' | 'recording';
+const pauseReasons = new Set<PauseReason>();
+/** A showcase recording needs the painters to run once — they acquire the
+ *  taps it records — whatever else holds them paused. */
+let forcedRuns = 0;
 let paused = false;
+
+function syncPaused(): void {
+  const next = pauseReasons.size > 0 && forcedRuns === 0;
+  if (next === paused) return;
+  paused = next;
+  if (!paused && rafHandle === null && painters.size > 0) {
+    rafHandle = requestAnimationFrame(paintFrame);
+  }
+}
 
 function paintFrame(): void {
   if (paused) {
@@ -214,17 +237,47 @@ function registerPainter(nodeId: string, paint: () => void): () => void {
 }
 
 /** Stop / resume every preview painter (and the timeline-curve previews,
- *  which read `arePreviewsPaused`). */
-function setPreviewsPaused(next: boolean): void {
-  if (next === paused) return;
-  paused = next;
-  if (!paused && rafHandle === null && painters.size > 0) {
-    rafHandle = requestAnimationFrame(paintFrame);
-  }
+ *  which read `arePreviewsPaused`) for one reason; they run again once no
+ *  reason holds. */
+function setPreviewsPaused(next: boolean, reason: PauseReason = 'app'): void {
+  if (next) pauseReasons.add(reason);
+  else pauseReasons.delete(reason);
+  syncPaused();
+}
+
+/** Showcase recording: run the painters whatever pauses them, until the
+ *  returned release is called. */
+function forcePreviewsRunning(): () => void {
+  forcedRuns += 1;
+  syncPaused();
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    forcedRuns -= 1;
+    syncPaused();
+  };
 }
 
 function arePreviewsPaused(): boolean {
   return paused;
+}
+
+const NO_SAMPLES = new Float32Array(0);
+
+/** A wave or signal tap's samples, or an audiogram tap's spectrum (dB per
+ *  bin) — whatever array the analyser (or its recording) holds now. */
+function readArray(tap: Tap): Float32Array {
+  const value = tap.analyser.getValue();
+  if (value instanceof Float32Array) return value;
+  return Array.isArray(value) ? Float32Array.from(value) : NO_SAMPLES;
+}
+
+/** A meter tap's level (dB; the loudest channel). */
+function readLevel(tap: Tap): number {
+  const value = tap.analyser.getValue();
+  if (typeof value === 'number') return value;
+  return value.length > 0 ? Math.max(...value) : -Infinity;
 }
 
 /** Dev/verification: read a node's current FFT bins (audiogram tap) —
@@ -232,12 +285,15 @@ function arePreviewsPaused(): boolean {
 function getTapFftBins(nodeId: string): number[] | null {
   const tap = taps.get(nodeId);
   if (!tap || tap.mode !== 'audiogram') return null;
-  return Array.from((tap.analyser as Tone.FFT).getValue());
+  return Array.from(readArray(tap));
 }
 
 export {
   acquireTap,
   arePreviewsPaused,
+  forcePreviewsRunning,
+  readArray,
+  readLevel,
   getLiveTaps,
   replaceTapAnalyser,
   setPreviewsPaused,
@@ -246,4 +302,4 @@ export {
   registerPainter,
   setPreviewMode,
 };
-export type { Tap, TapMode };
+export type { PauseReason, PreviewAnalyser, Tap, TapMode };

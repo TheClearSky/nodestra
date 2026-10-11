@@ -979,7 +979,7 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x030102);
   scene.fog = new THREE.FogExp2(0x030102, 0.05);
-  const environment = makeEnvironment(renderer);
+  let environment = makeEnvironment(renderer);
   scene.environment = environment;
   scene.environmentIntensity = 0.55;
 
@@ -1592,11 +1592,19 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
           );
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
-    composer.setPixelRatio(pixelRatio);
+    // The composer's pixel ratio is not set here: it took the renderer's
+    // when it was made, and `applyLevel` sets both whenever the ratio
+    // changes. Setting it again re-allocated every pass's targets, twice
+    // per resize with the `setSize` below.
     composer.setSize(width, height);
     if (options.reducedMotion) {
       piano.pose(1.0);
       placeCamera(0);
+      composer.render(0);
+    } else if (!looping) {
+      // A resize clears the canvas. With the loop stopped (off screen, a
+      // hidden tab, paused), one frame is drawn now, so nobody scrolls back
+      // into a blank canvas (Blip does the same).
       composer.render(0);
     }
   };
@@ -1621,6 +1629,23 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
   };
   const gate = createRenderGate(canvas, syncLoop);
   syncLoop();
+
+  // A lost WebGL context (a phone under memory pressure, a GPU reset) comes
+  // back with every render target empty. three.js uploads the geometry and
+  // textures again by itself; what was drawn only once is redrawn here: the
+  // spot's shadow map and the PMREM environment. The loop draws the rest.
+  const onContextLost = () => console.warn('[stage] the piano stage lost its WebGL context');
+  const onContextRestored = () => {
+    console.warn('[stage] the piano stage got its WebGL context back; redrawing its shadow and environment');
+    renderer.shadowMap.needsUpdate = true;
+    environment.dispose();
+    environment = makeEnvironment(renderer);
+    scene.environment = environment;
+    // Reduced motion has no loop: show the still frame again.
+    if (options.reducedMotion) composer.render(0);
+  };
+  canvas.addEventListener('webglcontextlost', onContextLost);
+  canvas.addEventListener('webglcontextrestored', onContextRestored);
 
   return {
     resize,
@@ -1680,6 +1705,9 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
     },
     quality: describeQuality,
     dispose() {
+      // First: the context is given up on purpose below, which is no loss.
+      canvas.removeEventListener('webglcontextlost', onContextLost);
+      canvas.removeEventListener('webglcontextrestored', onContextRestored);
       gate.dispose();
       renderer.setAnimationLoop(null);
       canvas.removeEventListener('pointerdown', onPointerDown);
@@ -1705,6 +1733,11 @@ function createStageScene(canvas: HTMLCanvasElement, options: StageOptions): Sta
       bloom.dispose();
       composer.dispose();
       renderer.dispose();
+      // Give the context (and its back buffer) back now, not when the canvas
+      // is garbage-collected: the app runs right after the gate, and the
+      // meadows and Blip do the same. The canvas is dead from here on; a new
+      // stage needs a new canvas.
+      renderer.forceContextLoss();
     },
   };
 }

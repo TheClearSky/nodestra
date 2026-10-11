@@ -34,7 +34,7 @@ import { createMirror, type Mirror } from './water2';
 import type { Env2 } from './v2-kit';
 import { createSceneSparkles, createSceneWater } from './scene-water';
 import { createFlowerBed, createFlowerPatches, createSceneGrass, grassQuality, type SceneGrass } from './scene-grass';
-import type { TierParams } from './scene-quality';
+import { readTuning, type TierParams } from './scene-quality';
 import type { FlowerKind } from './cardgrass';
 import { WATER_Y, heightAt, riverDistance, riverX } from './scene-terrain';
 
@@ -291,7 +291,8 @@ export function createWorld(o: WorldOptions): World {
     if (Math.hypot(x, z) < 0.6) return true; // the trunk
     return o.keepOut?.(x, z) ?? false;
   };
-  const density = Number(new URLSearchParams(location.search).get('grass') ?? (o.density ?? 1) * o.quality.grass);
+  // ?grass= is validated (0–1.5): a crafted link must not ask for millions of cards.
+  const density = readTuning(location.search).grass ?? (o.density ?? 1) * o.quality.grass;
   const grassSpec = {
     u,
     shadow: shadow.uniforms,
@@ -342,14 +343,22 @@ export function createWorld(o: WorldOptions): World {
   composer.addPass(output);
 
   let size = { w: 0, h: 0 };
+  /** The composer took the renderer's pixel ratio when it was made. */
+  let composerPixelRatio = pixelRatio;
   const resize = (width: number, height: number) => {
     if (width === 0 || height === 0) return;
     size = { w: width, h: height };
-    renderer.setPixelRatio(pixelRatio);
+    // The pixel ratio is set only when it changed: each set re-sizes the
+    // canvas (renderer) or re-allocates every pass's targets (composer), and
+    // the sizes are set right after anyway.
+    if (renderer.getPixelRatio() !== pixelRatio) renderer.setPixelRatio(pixelRatio);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
     renderer.setSize(width, height, false);
-    composer.setPixelRatio(pixelRatio);
+    if (composerPixelRatio !== pixelRatio) {
+      composerPixelRatio = pixelRatio;
+      composer.setPixelRatio(pixelRatio);
+    }
     composer.setSize(width, height);
     mirror.setSize(width * pixelRatio, height * pixelRatio);
   };

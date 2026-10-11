@@ -4,8 +4,8 @@
  *   app       the real thing at /app (the default)
  *   showcase  the landing page's live showcase frames (`showcase.html`): the
  *             same App, started without the "click to start audio" stage. The
- *             frame isolates storage BEFORE the app loads
- *             (`showcase/frame/isolateStorage.ts`), so a showcase is always a
+ *             frame isolates storage BEFORE the app loads (the classic
+ *             script in `showcase.html`), so a showcase is always a
  *             fresh first visit and never sees the visitor's library.
  *     audio 'recorded'  a card or the tour: nobody has clicked, so the open
  *                       graph is recorded silently and played back
@@ -31,5 +31,9 @@ function isLiveShowcase(): boolean {
   return current.kind === 'showcase' && current.audio === 'live';
 }
 
-export { isLiveShowcase, isShowcase, setAppEnvironment };
-export type { AppEnvironment };
+/** A landing card or the tour: silent, nobody is using it. */
+function isRecordedShowcase(): boolean {
+  return current.kind === 'showcase' && current.audio === 'recorded';
+}
+
+export { isLiveShowcase, isRecordedShowcase, isShowcase, setAppEnvironment };

@@ -1,4 +1,5 @@
 import * as Tone from 'tone';
+import { isRecordedShowcase } from '../appEnvironment';
 import { startAudio } from '../audio/bootstrap';
 import { STORAGE_NAMESPACE } from '../storageNamespace';
 
@@ -43,7 +44,9 @@ async function setBlipMuted(next: boolean): Promise<void> {
 }
 
 function chirp(): void {
-  if (muted || Tone.getContext().state !== 'running') return;
+  // A landing card or the tour plays silently; its audio context may still be
+  // running (the visitor's clicks on the page let it start).
+  if (muted || isRecordedShowcase() || Tone.getContext().state !== 'running') return;
   const now = performance.now();
   if (now - lastChirp < MIN_GAP_MS) return;
   lastChirp = now;

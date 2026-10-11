@@ -3,8 +3,150 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Nodestra — live showcase</title>
+    <script>
+      /*
+       * Storage isolation: this window's storage is its own and lives only in
+       * memory. It runs here, as a classic script, because a classic script
+       * runs before ANY module script — the app's own chunks included (a
+       * built module's shared chunks run before the module's body, so an
+       * import at the top of main.tsx would not be first). The frame shares
+       * the landing page's origin; without this the real App inside it would
+       * read, and autosave into, the visitor's own library and settings. The
+       * App persists only through localStorage, sessionStorage and IndexedDB
+       * (`src/__tests__/showcaseIsolation.test.ts` guards that), so replacing
+       * those three makes every showcase a fresh first visit; without
+       * IndexedDB the library falls back to its in-memory store. If this
+       * fails, the frame says so and main.tsx refuses to start the app.
+       */
+      (function () {
+        function memoryStorage() {
+          var items = new Map();
+          var api = {
+            get length() {
+              return items.size;
+            },
+            clear: function () {
+              items.clear();
+            },
+            getItem: function (key) {
+              key = String(key);
+              return items.has(key) ? items.get(key) : null;
+            },
+            key: function (index) {
+              return Array.from(items.keys())[index] ?? null;
+            },
+            removeItem: function (key) {
+              items.delete(String(key));
+            },
+            setItem: function (key, value) {
+              items.set(String(key), String(value));
+            },
+          };
+          // Named access (`storage.key`, `Object.keys(storage)`) behaves as a
+          // real Storage's does.
+          return new Proxy(api, {
+            get: function (target, name) {
+              if (typeof name !== 'string' || name in target) return target[name];
+              return target.getItem(name) ?? undefined;
+            },
+            set: function (target, name, value) {
+              if (typeof name !== 'string' || name in target) return false;
+              target.setItem(name, value);
+              return true;
+            },
+            deleteProperty: function (target, name) {
+              if (typeof name === 'string') target.removeItem(name);
+              return true;
+            },
+            has: function (target, name) {
+              return name in target || (typeof name === 'string' && target.getItem(name) !== null);
+            },
+            ownKeys: function () {
+              return Array.from(items.keys());
+            },
+            getOwnPropertyDescriptor: function (target, name) {
+              if (typeof name !== 'string' || !items.has(name)) return undefined;
+              return { value: items.get(name), writable: true, enumerable: true, configurable: true };
+            },
+          });
+        }
+        function replace(name, value) {
+          Object.defineProperty(window, name, { value: value, configurable: true, enumerable: true, writable: false });
+          if (window[name] !== value) throw new Error('could not isolate ' + name);
+        }
+        try {
+          replace('localStorage', memoryStorage());
+          replace('sessionStorage', memoryStorage());
+          replace('indexedDB', undefined);
+          window.__showcaseIsolated = true;
+        } catch (error) {
+          console.error('[showcase] storage isolation failed; the app will not start', error);
+          if (window.parent !== window) {
+            window.parent.postMessage({ type: 'showcase:failed', message: 'storage isolation failed' }, location.origin);
+          }
+        }
+      })();
+    </script>
+    <script>
+      /*
+       * Scroll containment: a frame's focus() and scrollIntoView() also
+       * scroll every page around the frame, to bring the element into view.
+       * The landing page jumped to the tour (or a card) whenever a screen
+       * inside it focused something — Blip's offer focuses "Show me how" on
+       * its own. Here both move only this frame's own scroll boxes. Classic,
+       * like the isolation script, so it is in place before React's autoFocus.
+       */
+      (function () {
+        // How far to scroll a box so [a, b] shows within [lo, hi].
+        function delta(a, b, lo, hi, mode) {
+          if (mode === 'start') return a - lo;
+          if (mode === 'end') return b - hi;
+          if (mode === 'center') return (a + b) / 2 - (lo + hi) / 2;
+          if (a < lo) return a - lo;
+          if (b > hi) return Math.min(b - hi, a - lo);
+          return 0;
+        }
+        function scrollWithin(element, block, inline) {
+          for (var box = element.parentElement; box && box !== document.body && box !== document.documentElement; box = box.parentElement) {
+            var style = getComputedStyle(box);
+            var canY = box.scrollHeight > box.clientHeight && style.overflowY !== 'visible';
+            var canX = box.scrollWidth > box.clientWidth && style.overflowX !== 'visible';
+            if (!canY && !canX) continue;
+            var r = element.getBoundingClientRect();
+            var b = box.getBoundingClientRect();
+            var top = b.top + box.clientTop;
+            var left = b.left + box.clientLeft;
+            if (canY) box.scrollTop += delta(r.top, r.bottom, top, top + box.clientHeight, block);
+            if (canX) box.scrollLeft += delta(r.left, r.right, left, left + box.clientWidth, inline);
+          }
+          // This frame's own document (window.scrollBy here never scrolls the page around it).
+          var last = element.getBoundingClientRect();
+          window.scrollBy(delta(last.left, last.right, 0, innerWidth, inline), delta(last.top, last.bottom, 0, innerHeight, block));
+        }
+        Element.prototype.scrollIntoView = function (options) {
+          var block = options === false ? 'end' : (options && options.block) || 'start';
+          var inline = (options && options.inline) || 'nearest';
+          scrollWithin(this, block, inline);
+        };
+        if (Element.prototype.scrollIntoViewIfNeeded) {
+          Element.prototype.scrollIntoViewIfNeeded = function () {
+            scrollWithin(this, 'nearest', 'nearest');
+          };
+        }
+        [window.HTMLElement, window.SVGElement].forEach(function (type) {
+          if (!type || !type.prototype.focus) return;
+          var focus = type.prototype.focus;
+          type.prototype.focus = function (options) {
+            var asked = options && options.preventScroll;
+            focus.call(this, Object.assign({}, options, { preventScroll: true }));
+            if (!asked && document.activeElement === this) scrollWithin(this, 'nearest', 'nearest');
+          };
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
