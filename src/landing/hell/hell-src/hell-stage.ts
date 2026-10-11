@@ -115,6 +115,10 @@ export type HellScene = {
     seek(t: number): void;
     duration: number;
     mode(): string;
+    /** One frame at the scene's time t, advanced by dt (default 1/60); with
+     *  draw false only the world advances (the landing tour's fast-forward:
+     *  the classes step at most 0.05 s per call). */
+    renderAt(t: number, dt?: number, draw?: boolean): void;
     camera: THREE.PerspectiveCamera;
     scene: THREE.Scene;
     renderer: THREE.WebGLRenderer;
@@ -529,7 +533,7 @@ export function createHellScene(canvas: HTMLCanvasElement, options: HellSceneOpt
   // ── the frame ──
   /** The scene's own clock (s): it advances only while frames are drawn. */
   let elapsed = 0;
-  const step = (t: number, dt: number) => {
+  const step = (t: number, dt: number, draw = true) => {
     env.uTime.value = t;
     env.uFrame.value = (env.uFrame.value + 1) % 100000;
     // The camera first, so every class sees this frame's camera.
@@ -555,6 +559,7 @@ export function createHellScene(canvas: HTMLCanvasElement, options: HellSceneOpt
     for (const cls of classes) cls.update?.(t, classDt);
     demoFrame();
     streaks.update(mode === 'flying' ? lastVel.length() : 0, dt);
+    if (!draw) return;
     for (const cb of preRender) cb();
     composer.render(classDt);
   };
@@ -744,6 +749,10 @@ export function createHellScene(canvas: HTMLCanvasElement, options: HellSceneOpt
       },
       duration: flight.duration,
       mode: () => mode,
+      renderAt: (t, dt = 1 / 60, draw = true) => {
+        elapsed = t;
+        step(t, dt, draw);
+      },
       camera,
       scene,
       renderer,
