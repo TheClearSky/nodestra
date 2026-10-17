@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { NodestraMark } from '../components/NodestraMark';
+import { GitHubLink } from './GitHubLink';
 import { SCREENS } from './screens';
 
 /*
@@ -70,6 +71,9 @@ function SiteFooter() {
               {item.label}
             </a>
           ))}
+          <a href='https://github.com/TheClearSky/nodestra' target='_blank' rel='noreferrer' className='hover:text-primary-white'>
+            Nodestra on GitHub ↗
+          </a>
           <a href='https://github.com/TheClearSky/react-blender-nodes' target='_blank' rel='noreferrer' className='hover:text-primary-white'>
             Built on react-blender-nodes ↗
           </a>
@@ -98,7 +102,8 @@ function SiteNav({ className = 'border-b border-white/8 bg-primary-black/80 back
             </li>
           ))}
         </ul>
-        <div className='ml-auto md:ml-0'>
+        <div className='ml-auto flex items-center gap-2.5 md:ml-0'>
+          <GitHubLink className='grid h-9 w-9 place-items-center rounded-full border border-[#e9d3a8]/40 bg-white/8 text-primary-white backdrop-blur-sm transition-colors hover:bg-white/16 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#e9d3a8]' />
           <OpenAppButton />
         </div>
       </nav>
